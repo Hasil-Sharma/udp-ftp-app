@@ -7,4 +7,7 @@ CFLAGS = -g
 all: client
 
 client:
-	$(CC) -o client client.c $(CFLAG) $(LIBS)
+	$(CC) -o client client.c $(CFLAGS) $(LIBS)
+
+clean:
+	rm -r client
