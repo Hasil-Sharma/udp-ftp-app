@@ -60,6 +60,7 @@ int main(int argc, char *argv[]){
       DEBUGN("Sent Bytes to Server", nbytes);
 
       // recvfrom stores the information of sender in from_addr
+      // This will keep on blocking in case the messages are lost while in flight
       nbytes = recvfrom(sock, buff, MAXBUFSIZE, 0, (struct sockaddr *)&from_addr, &from_addr_length);
       buff[nbytes] = '\0';
       INFOS("Received From Server", buff);

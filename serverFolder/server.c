@@ -57,6 +57,7 @@ int main(int argc, char *argv[]){
  remote_length = sizeof(remote);
  while(flag){
 
+      // This will keep on blocking in case the messages are lost while in flight
      nbytes = recvfrom(sock, buff, MAXBUFSIZE, 0, (struct sockaddr *)&remote, &remote_length);
      buff[nbytes] = '\0';
      
