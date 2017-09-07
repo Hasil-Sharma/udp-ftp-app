@@ -16,6 +16,11 @@
 #define MAXBUFSIZE 100
 #define TRUE 1
 #define FALSE 0
+#define DEBUGN(d, s) fprintf(stderr,"DEBUG: %s: %d\n", d, s)
+#define DEBUGS(d, s) fprintf(stderr,"DEBUG: %s: %s\n", d, s)
+#define INFON(d, s) fprintf(stdout, "INFO: %s: %d\n", d, s)
+#define INFOS(d, s) fprintf(stdout, "INFO: %s: %s\n", d, s)
+
 int main(int argc, char *argv[]){
 
  int sock;
@@ -23,7 +28,7 @@ int main(int argc, char *argv[]){
  struct sockaddr_in sin, remote;
  unsigned int remote_length;
  int nbytes;
- char buff[MAXBUFSIZE];
+ char buff[MAXBUFSIZE], command[MAXBUFSIZE];
  
  if (argc != 2){
    fprintf(stderr, "USAGE : <port>\n"); // TODO: make it print via stderr
@@ -46,25 +51,34 @@ int main(int argc, char *argv[]){
  }
 
  bzero(&remote, sizeof(remote));
- remote_length = sizeof(remote);
-
- //wait for an incoming message
  bzero(buff, sizeof(buff));
+ bzero(command, sizeof(command));
 
+ remote_length = sizeof(remote);
  while(flag){
-   nbytes = recvfrom(sock, buff, MAXBUFSIZE, 0, (struct sockaddr *)&remote, &remote_length);
-   buff[nbytes] = '\0';
-   fprintf(stdout, "Received: %s\n", buff);
-   
-   // TODO :make it case-insensitive
 
-   if (strcmp(buff, "exit") == 0) {
-     flag = FALSE;
-   } else if (strcmp(buff, "ls") == 0) {
+     nbytes = recvfrom(sock, buff, MAXBUFSIZE, 0, (struct sockaddr *)&remote, &remote_length);
+     buff[nbytes] = '\0';
+     
+     DEBUGS("Received from Client", buff);
+     fprintf(stdout, "Enter the command you want to send:\n");
+     if( fgets(command, MAXBUFSIZE, stdin) != NULL ) {
 
+        // This does not breaks up the space delimited sentence 
+        // TODO: Surety that this command is sent as a single chunk
+
+        // strlen(command) - 1 to not send the '\n' character
+
+       nbytes = sendto(sock, command, strlen(command) - 1, 0, (struct sockaddr *)&remote, remote_length);
+       DEBUGN("Sent Bytes to Client", nbytes);
+       bzero(&remote, sizeof(remote));
+     // TODO :make it case-insensitive
+
+   } else {
+     fprintf(stderr, "error in reading from the input\n");
+     exit(1);
    }
  }
-
  close(sock);
  return 0;
 }
