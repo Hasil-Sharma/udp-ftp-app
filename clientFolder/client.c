@@ -21,13 +21,17 @@
 #define INFON(d, s) fprintf(stdout, "INFO: %s: %d\n", d, s)
 #define INFOS(d, s) fprintf(stdout, "INFO: %s: %s\n", d, s)
 
+int sendwithsock(int, char*, struct sockaddr_in*, unsigned int); 
+int recvwithsock(int, char*, struct sockaddr_in*, unsigned int*);
+
 int main(int argc, char *argv[]){
   int nbytes;
   int sock, read_line;
   char buff[MAXBUFSIZE], command[MAXBUFSIZE];
   unsigned int remote_length, from_addr_length;
   struct sockaddr_in remote, from_addr;
-  int flag = TRUE;
+  int flag = TRUE, flag_connection = TRUE;
+
   if (argc < 3) {
     fprintf(stderr, "USAGE: <server_ip> <server_port>\n"); 
     exit(1);
@@ -47,33 +51,58 @@ int main(int argc, char *argv[]){
   if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { fprintf(stderr, "unable to create socket\n"); }
  
   while(flag){
+      fprintf(stdout, ">>> ");
+      if( fgets(command, MAXBUFSIZE, stdin) != NULL && flag_connection) { 
+        
+        // This does not breaks up the space delimited sentence 
+        // TODO: Surety that this command is sent as a single chunk
+        
+        /*if (strncasecmp(command, "get ", 4) == 0){}*/
+        if (strcasecmp(command, "ls\n") == 0){
 
-    fprintf(stdout, "Enter the command you want to send:\n");
-    if( fgets(command, MAXBUFSIZE, stdin) != NULL ) { 
-      
-      // This does not breaks up the space delimited sentence 
-      // TODO: Surety that this command is sent as a single chunk
+          nbytes = sendwithsock(sock, "3", &remote, remote_length);
+          DEBUGN("Sent Bytes to Server", nbytes);
+          nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);
+          buff[nbytes] = '\0';
+          fprintf(stdout, "<<< %s\n", buff);
+        
+        } else if (strcasecmp(command, "exit\n") == 0){
+            nbytes = sendwithsock(sock, "4", &remote, remote_length);
+            DEBUGN("Sent Bytes to Server", nbytes);
+            flag_connection = FALSE;
+        } else if (strcasecmp(command, "exit\n") != 0)  {
+          
+          command[strlen(command)- 1] = '\0';
+          nbytes = sendwithsock(sock, command, &remote, remote_length);
+          DEBUGN("Sent Bytes to Server", nbytes);
+          nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);
+          buff[nbytes] = '\0';
+          fprintf(stdout, "<<< %s\n", buff);
 
-      // strlen(command) - 1 to not send the '\n' character
-      
-      nbytes = sendto(sock, command, strlen(command) - 1, 0, (struct sockaddr *)&remote, remote_length);
-      DEBUGN("Sent Bytes to Server", nbytes);
 
-      // recvfrom stores the information of sender in from_addr
-      // This will keep on blocking in case the messages are lost while in flight
-      nbytes = recvfrom(sock, buff, MAXBUFSIZE, 0, (struct sockaddr *)&from_addr, &from_addr_length);
-      buff[nbytes] = '\0';
-      INFOS("Received From Server", buff);
-      // Check if from_addr and remote point to same port
-
-      if (strcmp(command, "exit\n") == 0) { flag = FALSE; }
-    } else { 
-      fprintf(stderr, "error in reading from the input\n"); 
-      exit(1); //TODO: Think it through
+      } else { 
+        if (!flag_connection) {
+          fprintf(stdout, "<<< Connection to server already closed\n");
+        } else {
+          fprintf(stderr, "error in reading from the input\n"); 
+          exit(1); //TODO: Think it through
+        }
+      }
     }
   }
 
   close(sock);
   return 0;
 
+}
+
+int sendwithsock(int sock, char *command, struct sockaddr_in *remote, unsigned int remote_length) {
+  // TODO: Surety that this command is sent as a single chunk
+  return sendto(sock, command, strlen(command), 0, (struct sockaddr *)remote, remote_length);
+}
+
+int recvwithsock(int sock, char *buff, struct sockaddr_in * from_addr, unsigned int * from_addr_length) {
+  // recvfrom stores the information of sender in from_addr
+  // This will keep on blocking in case the messages are lost while in flight
+  return recvfrom(sock, buff, MAXBUFSIZE, 0, (struct sockaddr *)from_addr, from_addr_length);
 }

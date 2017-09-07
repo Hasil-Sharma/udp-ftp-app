@@ -1,11 +1,12 @@
 #include <sys/types.h>
+#include <dirent.h>
+#include <stdio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <signal.h>
-#include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/time.h>
@@ -20,6 +21,8 @@
 #define DEBUGS(d, s) fprintf(stderr,"DEBUG: %s: %s\n", d, s)
 #define INFON(d, s) fprintf(stdout, "INFO: %s: %d\n", d, s)
 #define INFOS(d, s) fprintf(stdout, "INFO: %s: %s\n", d, s)
+
+char* getdir();
 
 int main(int argc, char *argv[]){
 
@@ -62,25 +65,65 @@ int main(int argc, char *argv[]){
      buff[nbytes] = '\0';
      
      DEBUGS("Received from Client", buff);
-     fprintf(stdout, "Enter the command you want to send:\n");
-     if( fgets(command, MAXBUFSIZE, stdin) != NULL ) {
+     
+     if (strcasecmp(buff, "3") == 0) {
+       // populate the files in directory
+       strcpy(command , getdir());
+     } else if (strncasecmp(buff, "get ", 4) == 0) {
+      // method for the get
+       strcpy(command , "return of get");
+     } else if (strncasecmp(buff, "put ", 4) == 0) {
+      // method for the put
+       strcpy(command , "return of put");
+     } else if (strncasecmp(buff, "delete ", 7) == 0) {
+      // method for delete
+       strcpy(command , "return of delete");
+     } else if (strcasecmp(buff, "4") == 0) {
+      // Server should shut down gracefully
+       flag = FALSE;
+       continue;
+     } else {
+       sprintf(command, "Command not understood: %s", buff);
+      // the server should simply repeat the command back to the
+      // client with no modification, stating that the given command was not understood.
+     }
 
-        // This does not breaks up the space delimited sentence 
-        // TODO: Surety that this command is sent as a single chunk
-
-        // strlen(command) - 1 to not send the '\n' character
-
-       nbytes = sendto(sock, command, strlen(command) - 1, 0, (struct sockaddr *)&remote, remote_length);
-       DEBUGN("Sent Bytes to Client", nbytes);
-       bzero(&remote, sizeof(remote));
-     // TODO :make it case-insensitive
-
-   } else {
-     fprintf(stderr, "error in reading from the input\n");
-     exit(1);
-   }
+     nbytes = sendto(sock, command, strlen(command), 0, (struct sockaddr *)&remote, remote_length);
+     DEBUGS("Returning String", command);
+     DEBUGN("Sent Bytes to Client", nbytes);
  }
+
  close(sock);
  return 0;
 }
+
+char *getdir(){
+	DIR *d;
+	char * result;
+	result = (char *) malloc(MAXBUFSIZE*sizeof(char));
+	bzero(result, sizeof(char *));
+  int flag = 0;
+	struct dirent *dir;
+	d = opendir("./files");
+	if (d){
+		while ((dir = readdir(d)) != NULL){
+			if(strcmp(dir->d_name, ".") && strcmp(dir->d_name, "..")){
+				if(flag) strcat(result, "\t");		
+				strcat(result, dir->d_name);
+				flag = 1;
+			}
+		}
+		closedir(d); 
+	}
+
+	return result;
+}
+
+
+
+
+
+
+
+
 
