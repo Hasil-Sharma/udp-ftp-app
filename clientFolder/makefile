@@ -7,7 +7,7 @@ CFLAGS = -g
 all: client
 
 client:
-	$(CC) -o client client.c $(CFLAGS) $(LIBS)
+	$(CC) -o client ../headers/*.c client.c $(CFLAGS) $(LIBS)
 
 clean:
 	rm -r client

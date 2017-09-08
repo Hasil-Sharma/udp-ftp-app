@@ -12,24 +12,22 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <string.h>
+#include "../headers/packet.h"
+#include "../headers/debugutils.h"
 
-#define MAXBUFSIZE 100
+#define MAXBUFSIZE 120 // Set the limit on the length of the file
 #define TRUE 1
 #define FALSE 0
-#define DEBUGN(d, s) fprintf(stderr,"DEBUG: %s: %d\n",d,s)
-#define DEBUGS(d, s) fprintf(stderr,"DEBUG: %s: %s\n",d, s)
-#define INFON(d, s) fprintf(stdout, "INFO: %s: %d\n", d, s)
-#define INFOS(d, s) fprintf(stdout, "INFO: %s: %s\n", d, s)
-
-int sendwithsock(int, char*, struct sockaddr_in*, unsigned int); 
-int recvwithsock(int, char*, struct sockaddr_in*, unsigned int*);
 
 int main(int argc, char *argv[]){
-  int nbytes;
-  int sock, read_line;
+  
+  int nbytes, sock, read_line;
   char buff[MAXBUFSIZE], command[MAXBUFSIZE];
   unsigned int remote_length, from_addr_length;
+  unsigned short int seq_id;
   struct sockaddr_in remote, from_addr;
+  struct packet send_pkt, recv_pkt;
+
   int flag = TRUE, flag_connection = TRUE;
 
   if (argc < 3) {
@@ -49,7 +47,12 @@ int main(int argc, char *argv[]){
   from_addr_length = sizeof(from_addr);
 
   if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { fprintf(stderr, "unable to create socket\n"); }
- 
+  
+  struct timeval tv;
+  tv.tv_sec = 5;  /* 30 Secs Timeout */
+  tv.tv_usec = 0;  // Not init'ing this can cause strange errors
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
+   
   while(flag){
       fprintf(stdout, ">>> ");
       if( fgets(command, MAXBUFSIZE, stdin) != NULL && flag_connection) { 
@@ -60,15 +63,18 @@ int main(int argc, char *argv[]){
         command[strlen(command) - 1] = '\0'; // remove the trailing \n
 
         if (strncasecmp(command, "get ", 4) == 0){
-
-          nbytes = sendwithsock(sock, "0", &remote, remote_length);
+          
+          seq_id = 0;
+          nbytes = sendpkt(sock, &send_pkt, READ, seq_id, command, &remote, remote_length);
           DEBUGN("Sent Bytes to Server", nbytes);
-          nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);
-          buff[nbytes] = '\0';
-          fprintf(stdout, "<<< %s\n", buff);
+          nbytes = waitforpkt(sock, &send_pkt, &recv_pkt, &from_addr, &from_addr_length, &remote, remote_length);
+          DEBUGN("Rev Bytes from Server", nbytes);
 
         } else if (strncasecmp(command, "put ", 4) == 0){
-
+          
+          seq_id = 0;
+          fill_header(&send_pkt, 2, seq_id);  
+          
           nbytes = sendwithsock(sock, "1", &remote, remote_length);
           DEBUGN("Sent Bytes to Server", nbytes);
           nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);
@@ -77,6 +83,9 @@ int main(int argc, char *argv[]){
         
         } else if (strncasecmp(command, "delete ", 7) == 0){
 
+          seq_id = 0;
+          fill_header(&send_pkt, 3, seq_id);  
+          
           nbytes = sendwithsock(sock, "2", &remote, remote_length);
           DEBUGN("Sent Bytes to Server", nbytes);
           nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);
@@ -85,6 +94,9 @@ int main(int argc, char *argv[]){
         
         } else if (strcasecmp(command, "ls") == 0){
 
+          seq_id = 0;
+          fill_header(&send_pkt, 4, seq_id);  
+          
           nbytes = sendwithsock(sock, "3", &remote, remote_length);
           DEBUGN("Sent Bytes to Server", nbytes);
           nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);
@@ -92,13 +104,19 @@ int main(int argc, char *argv[]){
           fprintf(stdout, "<<< %s\n", buff);
         
         } else if (strcasecmp(command, "exit") == 0){
-
+          
+          seq_id = 0;
+          fill_header(&send_pkt, 5, seq_id);  
+          
           nbytes = sendwithsock(sock, "4", &remote, remote_length);
           DEBUGN("Sent Bytes to Server", nbytes);
           flag_connection = FALSE;
 
         } else {
 
+          seq_id = 0;
+          fill_header(&send_pkt, 6, seq_id);  
+          
           nbytes = sendwithsock(sock, command, &remote, remote_length);
           DEBUGN("Sent Bytes to Server", nbytes);
           nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);
@@ -126,13 +144,3 @@ int main(int argc, char *argv[]){
 
 }
 
-int sendwithsock(int sock, char *command, struct sockaddr_in *remote, unsigned int remote_length) {
-  // TODO: Surety that this command is sent as a single chunk
-  return sendto(sock, command, strlen(command), 0, (struct sockaddr *)remote, remote_length);
-}
-
-int recvwithsock(int sock, char *buff, struct sockaddr_in * from_addr, unsigned int * from_addr_length) {
-  // recvfrom stores the information of sender in from_addr
-  // This will keep on blocking in case the messages are lost while in flight
-  return recvfrom(sock, buff, MAXBUFSIZE, 0, (struct sockaddr *)from_addr, from_addr_length);
-}

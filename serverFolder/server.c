@@ -13,26 +13,21 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <string.h>
+#include "../headers/packet.h"
+#include "../headers/debugutils.h"
 
 #define MAXBUFSIZE 100
 #define TRUE 1
 #define FALSE 0
-#define DEBUGN(d, s) fprintf(stderr,"DEBUG: %s: %d\n", d, s)
-#define DEBUGS(d, s) fprintf(stderr,"DEBUG: %s: %s\n", d, s)
-#define INFON(d, s) fprintf(stdout, "INFO: %s: %d\n", d, s)
-#define INFOS(d, s) fprintf(stdout, "INFO: %s: %s\n", d, s)
-
-char* getdir();
 
 int main(int argc, char *argv[]){
 
- int sock;
- int flag = TRUE;
+ int sock, flag = TRUE, nbytes;
  struct sockaddr_in sin, remote;
  unsigned int remote_length;
- int nbytes;
  char buff[MAXBUFSIZE], command[MAXBUFSIZE];
- 
+ struct packet send_pkt, recv_pkt;
+
  if (argc != 2){
    fprintf(stderr, "USAGE : <port>\n"); // TODO: make it print via stderr
    exit(1);
@@ -61,48 +56,22 @@ int main(int argc, char *argv[]){
  while(flag){
 
       // This will keep on blocking in case the messages are lost while in flight
-     nbytes = recvfrom(sock, buff, MAXBUFSIZE, 0, (struct sockaddr *)&remote, &remote_length);
-     buff[nbytes] = '\0';
-     
-     DEBUGS("Received from Client", buff);
-    
-     if (strcmp(buff, "0") == 0) {
-       
-       // method for the get
-       strcpy(command , "return of get");
-    
-     } else if (strcmp(buff, "1") == 0) {
-       
-       // method for pu
-       strcpy(command, "return of put");
-    
-     } else if (strcmp(buff, "2") == 0) {
-       
-       //method for delete
-       strcpy(command, "return of delete");
 
-     } else if (strcmp(buff, "3") == 0) {
-       
-       // populate the files in directory
-       strcpy(command , getdir());
+    nbytes = recvwithsock(sock, &recv_pkt, &remote, &remote_length);
 
-     } else if (strcmp(buff, "4") == 0) {
-       
-       // Server should shut down gracefully
-       flag = FALSE;
-       continue;
+    DEBUGS1("Packet Recv");
+    debug_print_pkt(&recv_pkt);
 
-     } else {
-
-       sprintf(command, "Command not understood: %s", buff);
-       // the server should simply repeat the command back to the
-       // client with no modification, stating that the given command was not understood.
-     
-     }
-
-     nbytes = sendto(sock, command, strlen(command), 0, (struct sockaddr *)&remote, remote_length);
-     DEBUGS("Returning String", command);
-     DEBUGN("Sent Bytes to Client", nbytes);
+		switch(recv_pkt.hdr.flag) {
+			case 1 :
+				/* Packet is a get <file_name.txt> command
+					 Payload has the file name */
+				fill_header(&send_pkt, ACK, recv_pkt.hdr.seq_id);
+        DEBUGS1("Packet Sent");
+				debug_print_pkt(&send_pkt);
+				nbytes = sendwithsock(sock, &send_pkt, &remote, remote_length);
+				break;
+		} 
  }
 
  close(sock);
@@ -130,12 +99,3 @@ char *getdir(){
 
 	return result;
 }
-
-
-
-
-
-
-
-
-
