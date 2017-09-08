@@ -57,8 +57,33 @@ int main(int argc, char *argv[]){
         // This does not breaks up the space delimited sentence 
         // TODO: Surety that this command is sent as a single chunk
         
-        /*if (strncasecmp(command, "get ", 4) == 0){}*/
-        if (strcasecmp(command, "ls\n") == 0){
+        command[strlen(command) - 1] = '\0'; // remove the trailing \n
+
+        if (strncasecmp(command, "get ", 4) == 0){
+
+          nbytes = sendwithsock(sock, "0", &remote, remote_length);
+          DEBUGN("Sent Bytes to Server", nbytes);
+          nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);
+          buff[nbytes] = '\0';
+          fprintf(stdout, "<<< %s\n", buff);
+
+        } else if (strncasecmp(command, "put ", 4) == 0){
+
+          nbytes = sendwithsock(sock, "1", &remote, remote_length);
+          DEBUGN("Sent Bytes to Server", nbytes);
+          nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);
+          buff[nbytes] = '\0';
+          fprintf(stdout, "<<< %s\n", buff);
+        
+        } else if (strncasecmp(command, "delete ", 7) == 0){
+
+          nbytes = sendwithsock(sock, "2", &remote, remote_length);
+          DEBUGN("Sent Bytes to Server", nbytes);
+          nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);
+          buff[nbytes] = '\0';
+          fprintf(stdout, "<<< %s\n", buff);
+        
+        } else if (strcasecmp(command, "ls") == 0){
 
           nbytes = sendwithsock(sock, "3", &remote, remote_length);
           DEBUGN("Sent Bytes to Server", nbytes);
@@ -66,30 +91,35 @@ int main(int argc, char *argv[]){
           buff[nbytes] = '\0';
           fprintf(stdout, "<<< %s\n", buff);
         
-        } else if (strcasecmp(command, "exit\n") == 0){
-            nbytes = sendwithsock(sock, "4", &remote, remote_length);
-            DEBUGN("Sent Bytes to Server", nbytes);
-            flag_connection = FALSE;
-        } else if (strcasecmp(command, "exit\n") != 0)  {
-          
-          command[strlen(command)- 1] = '\0';
+        } else if (strcasecmp(command, "exit") == 0){
+
+          nbytes = sendwithsock(sock, "4", &remote, remote_length);
+          DEBUGN("Sent Bytes to Server", nbytes);
+          flag_connection = FALSE;
+
+        } else {
+
           nbytes = sendwithsock(sock, command, &remote, remote_length);
           DEBUGN("Sent Bytes to Server", nbytes);
           nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);
           buff[nbytes] = '\0';
           fprintf(stdout, "<<< %s\n", buff);
 
+        }
 
       } else { 
         if (!flag_connection) {
+          
           fprintf(stdout, "<<< Connection to server already closed\n");
+        
         } else {
+          
           fprintf(stderr, "error in reading from the input\n"); 
           exit(1); //TODO: Think it through
+        
         }
       }
     }
-  }
 
   close(sock);
   return 0;

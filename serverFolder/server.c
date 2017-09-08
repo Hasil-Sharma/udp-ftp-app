@@ -65,27 +65,39 @@ int main(int argc, char *argv[]){
      buff[nbytes] = '\0';
      
      DEBUGS("Received from Client", buff);
-     
-     if (strcasecmp(buff, "3") == 0) {
+    
+     if (strcmp(buff, "0") == 0) {
+       
+       // method for the get
+       strcpy(command , "return of get");
+    
+     } else if (strcmp(buff, "1") == 0) {
+       
+       // method for pu
+       strcpy(command, "return of put");
+    
+     } else if (strcmp(buff, "2") == 0) {
+       
+       //method for delete
+       strcpy(command, "return of delete");
+
+     } else if (strcmp(buff, "3") == 0) {
+       
        // populate the files in directory
        strcpy(command , getdir());
-     } else if (strncasecmp(buff, "get ", 4) == 0) {
-      // method for the get
-       strcpy(command , "return of get");
-     } else if (strncasecmp(buff, "put ", 4) == 0) {
-      // method for the put
-       strcpy(command , "return of put");
-     } else if (strncasecmp(buff, "delete ", 7) == 0) {
-      // method for delete
-       strcpy(command , "return of delete");
-     } else if (strcasecmp(buff, "4") == 0) {
-      // Server should shut down gracefully
+
+     } else if (strcmp(buff, "4") == 0) {
+       
+       // Server should shut down gracefully
        flag = FALSE;
        continue;
+
      } else {
+
        sprintf(command, "Command not understood: %s", buff);
-      // the server should simply repeat the command back to the
-      // client with no modification, stating that the given command was not understood.
+       // the server should simply repeat the command back to the
+       // client with no modification, stating that the given command was not understood.
+     
      }
 
      nbytes = sendto(sock, command, strlen(command), 0, (struct sockaddr *)&remote, remote_length);
