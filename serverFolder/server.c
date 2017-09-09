@@ -23,9 +23,9 @@ int main(int argc, char *argv[]){
 
   int sock, flag = TRUE, nbytes;
   struct sockaddr_in sin, remote;
-  unsigned int remote_length, offset;
-  schar buff[MAXBUFSIZE];
-  struct packet send_pkt, recv_pkt;
+  socklen_t remote_length, offset;
+  u_char buff[MAXBUFSIZE];
+  struct packet sent_pkt, recv_pkt;
   FILE *fp;
 
   if (argc != 2){
@@ -55,34 +55,22 @@ int main(int argc, char *argv[]){
     bzero(buff, sizeof(buff));
     remote_length = sizeof(remote);
     bzero(&recv_pkt, sizeof(recv_pkt)); 
-    bzero(&send_pkt, sizeof(send_pkt));
+    bzero(&sent_pkt, sizeof(sent_pkt));
 
     // This will keep on blocking in case the messages are lost while in flight
 
     nbytes = recvwithsock(sock, &recv_pkt, &remote, &remote_length);
-
-    DEBUGS1("Packet Recv");
+    
+    DEBUGS1("Request Packet Received"); 
     debug_print_pkt(&recv_pkt);
-
     if (recv_pkt.hdr.flag == READ) {
 
       if (recv_pkt.hdr.seq_id == 0) {
-
+        DEBUGS1("\t\tRequest is GET");
         // Get name of the file from buffer
         getfilenamefrompkt(buff, &recv_pkt);
+        chunkwritetosocket(sock, &sent_pkt, &recv_pkt, WRITE, buff, &remote, remote_length);
         
-        chunkwritetosocket(sock, &send_pkt, &recv_pkt, WRITE, buff, &remote, remote_length);
-        
-        /*fp = fopen(buff, "rb");*/
-        /*while(( offset = fread(buff, sizeof(schar), PAYLOAD_SIZE, fp)) != 0){*/
-          /*// Returned data packet is received seq_id + 1*/
-          /*nbytes = sendpkt(sock, &send_pkt, WRITE, recv_pkt.hdr.seq_id + 1, offset, buff, &remote, remote_length);*/
-          /*nbytes = waitforpkt(sock, &send_pkt, &recv_pkt, &remote, &remote_length, &remote, remote_length);*/
-        /*}*/
-
-        /*DEBUGS1("File Sent");*/
-        /*fclose(fp);*/
-
       } 
 
     } else {
@@ -95,23 +83,30 @@ int main(int argc, char *argv[]){
 }
 
 char *getdir(){
-	DIR *d;
-	char * result;
-	result = (char *) malloc(MAXBUFSIZE*sizeof(char));
-	bzero(result, sizeof(char *));
+  DIR *d;
+  char * result;
+  result = (char *) malloc(MAXBUFSIZE*sizeof(char));
+  bzero(result, sizeof(char *));
   int flag = 0;
-	struct dirent *dir;
-	d = opendir("./files");
-	if (d){
-		while ((dir = readdir(d)) != NULL){
-			if(strcmp(dir->d_name, ".") && strcmp(dir->d_name, "..")){
-				if(flag) strcat(result, "\t");		
-				strcat(result, dir->d_name);
-				flag = 1;
-			}
-		}
-		closedir(d); 
-	}
+  struct dirent *dir;
+  d = opendir("./files");
+  if (d){
 
-	return result;
+    while ((dir = readdir(d)) != NULL){
+
+      if(strcmp(dir->d_name, ".") && strcmp(dir->d_name, "..")){
+
+        if(flag) strcat(result, "\t");		
+
+        strcat(result, dir->d_name);
+        flag = 1;
+
+      }
+
+    }
+    closedir(d); 
+  }
+
+
+  return result;
 }

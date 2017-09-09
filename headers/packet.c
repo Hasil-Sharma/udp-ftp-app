@@ -6,19 +6,21 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <error.h>
+#include <assert.h>
 
-void fill_packet(struct packet* pkt, uint16_t flag, uint16_t seq_id, uint16_t offset, schar *payload){
+void fill_packet(struct packet* pkt, u_short flag, u_short seq_id, u_short offset, u_char *payload){
 	fill_header(pkt, flag, seq_id, offset);
+  memset(pkt->payload, 0, sizeof(pkt->payload));
 	fill_payload(pkt, payload);
 }
-void fill_header(struct packet* pkt, uint16_t flag, uint16_t seq_id, uint16_t offset){
+void fill_header(struct packet* pkt, u_short flag, u_short seq_id, u_short offset){
   bzero(pkt, sizeof(struct packet));
   pkt->hdr.offset = offset;
   pkt->hdr.seq_id = seq_id;
   pkt->hdr.flag = flag;
 }
 
-void fill_payload(struct packet* pkt, schar *payload){
+void fill_payload(struct packet* pkt, u_char *payload){
   bzero(pkt->payload, sizeof(pkt->payload));
   if (pkt->hdr.flag == ACK) { 
     // Do Nothing
@@ -26,7 +28,7 @@ void fill_payload(struct packet* pkt, schar *payload){
     // Sending file name in the packet; only for seq_id == 0
     if (pkt->hdr.seq_id == 0) {
       strcpy(pkt->payload, payload);
-      pkt->hdr.offset = (uint16_t) strlen(payload); // get filename.txt 4:"get " 
+      pkt->hdr.offset = (u_short) strlen(payload); // get filename.txt 4:"get " 
     }
   } else if (pkt->hdr.flag == WRITE) {
       memcpy(pkt->payload, payload, pkt->hdr.offset);
@@ -37,80 +39,113 @@ void fill_payload(struct packet* pkt, schar *payload){
   } 
 }
 
-void getfilenamefrompkt(schar *buff, struct packet * pkt){
-  strncpy(buff, pkt->payload, pkt->hdr.offset);
+void getfilenamefrompkt(u_char *buff, struct packet * pkt){
+  memcpy(buff, pkt->payload, pkt->hdr.offset);
 }
 
-int sendpkt(int sock, void *pkt, uint16_t flag, uint16_t seq_id, uint16_t offset, schar * payload,  struct sockaddr_in *remote_r, unsigned int remote_length){
+ssize_t sendpkt(int sock, struct packet *pkt, u_short flag, u_short seq_id, u_short offset, u_char * payload,  struct sockaddr_in *remote_r, socklen_t remote_length){
   
   fill_packet(pkt, flag, seq_id, offset, payload);
   return sendwithsock(sock, pkt, remote_r, remote_length);
 
 }
 
-int waitforpkt(int sock, void *prev_pkt,void *pkt, struct sockaddr_in *from_addr, unsigned int * from_addr_length_r, struct sockaddr_in *remote, unsigned int remote_length){
+ssize_t waitforpkt(int sock, struct packet *prev_pkt, struct packet *pkt, struct sockaddr_in *remote, socklen_t remote_length){
   // TODO: Implement check for the packet received to be the one we expect
-  int nbytes;
-  DEBUGS1("Wait for Pkt Method : Start");
+  ssize_t nbytes;
   while(1) {
-    nbytes = recvwithsock(sock, pkt, from_addr, from_addr_length_r);
-    
+    nbytes = recvwithsock(sock, pkt, remote, &remote_length);
+
     if(nbytes == PACKET_SIZE){ 
-      DEBUGN("Bytes Received", nbytes);
       break;
     }
     /*else if(nbytes == EAGAIN || nbytes == EWOULDBLOCK)*/
     else {
-      DEBUGS1("No Response Tramsmitting again");
       nbytes = sendwithsock(sock, prev_pkt, remote, remote_length);
-      DEBUGN("Bytes Sent", nbytes);
     }
   }
-  DEBUGS1("Wait for Pkt Method : End");
   return nbytes;
 }
-int sendwithsock(int sock, void *pkt, struct sockaddr_in *remote, unsigned int remote_length) {
+
+
+ssize_t sendwithsock(int sock, struct packet* pkt, struct sockaddr_in* remote, socklen_t remote_length) {
   // TODO: Surety that this command is sent as a single chunk
-  return sendto(sock, pkt, PACKET_SIZE, 0, (struct sockaddr *)remote, remote_length);
+
+  ssize_t nbytes = sendto(sock, pkt, PACKET_SIZE, 0, (struct sockaddr *)remote, remote_length);
+  assert(nbytes == PACKET_SIZE);
+  return nbytes;
 }
 
-int recvwithsock(int sock, void *pkt, struct sockaddr_in * from_addr, unsigned int * from_addr_length_r) {
+ssize_t recvwithsock(int sock, struct packet* pkt, struct sockaddr_in* from_addr, socklen_t* from_addr_length_r) {
   // recvfrom stores the information of sender in from_addr
   // This will keep on blocking in case the messages are lost while in flight
-  return recvfrom(sock, pkt, PACKET_SIZE, 0, (struct sockaddr *)from_addr, from_addr_length_r);
-}
-void chunkreadfromsocket(int sock, struct packet *send_pkt, struct packet *recv_pkt, uint16_t flag, uint16_t seq_id, uint16_t offset, schar *payload, struct sockaddr_in *remote, unsigned int remote_length, struct sockaddr_in *from_addr, unsigned int * from_addr_length_r){
 
-  int nbytes;
+  ssize_t nbytes = recvfrom(sock, pkt, PACKET_SIZE, 0, (struct sockaddr *)from_addr, from_addr_length_r);
+  DEBUGN("nbytes", nbytes);
+  DEBUGN("PACKET_SIZE", PACKET_SIZE);
+  assert(nbytes == PACKET_SIZE); 
+  return nbytes;
+}
+
+
+void chunkreadfromsocket(int sock, struct packet *sent_pkt, struct packet *recv_pkt, u_short flag, u_short seq_id, u_short offset, u_char *payload, struct sockaddr_in *remote, socklen_t remote_length){
+
+  ssize_t nbytes;
   FILE *fp;
 
-  nbytes = sendpkt(sock, send_pkt, READ, seq_id++, offset, payload, remote, remote_length);
-  nbytes = waitforpkt(sock, send_pkt, recv_pkt, from_addr, from_addr_length_r, remote, remote_length);
+  DEBUGS1("Reading from socket and writing to file");
+  
+  nbytes = sendpkt(sock, sent_pkt, flag, seq_id++, offset, payload, remote, remote_length);
+  
+  DEBUGN("\t\tRequest Packet Sent", seq_id - 1);
+  debug_print_pkt(sent_pkt);
+
+  // Waiting for response from server
+  nbytes = waitforpkt(sock, sent_pkt, recv_pkt, remote, remote_length);
+
+  DEBUGN("\t\tData Packet Recv", recv_pkt->hdr.seq_id);
+  debug_print_pkt(recv_pkt);
 
   fp = fopen(payload, "wb");
 
   while(1){
-    fwrite(recv_pkt->payload, sizeof(schar), recv_pkt->hdr.offset, fp);
+    fwrite(recv_pkt->payload, sizeof(u_char), recv_pkt->hdr.offset, fp);
+    
     if (recv_pkt->hdr.offset < PAYLOAD_SIZE) break;
-    nbytes = sendpkt(sock, send_pkt, ACK, seq_id++, 0, NULL, remote, remote_length);
-    nbytes = waitforpkt(sock, send_pkt, recv_pkt, from_addr, from_addr_length_r, remote, remote_length);
+    
+    nbytes = sendpkt(sock, sent_pkt, ACK, seq_id++, 0, NULL, remote, remote_length);
+    
+    DEBUGN("\t\tACK Packet Sent", seq_id - 1);
+    debug_print_pkt(sent_pkt);
+    
+    nbytes = waitforpkt(sock, sent_pkt, recv_pkt, remote, remote_length);
+    
+    DEBUGN("\t\tData Packet Recv", recv_pkt->hdr.seq_id);
+    debug_print_pkt(recv_pkt);
   }
 
   // Server should keep on sending the last packet
   fclose(fp);
 }
 
-void chunkwritetosocket(int sock, struct packet *send_pkt, struct packet *recv_pkt, uint16_t flag, schar *payload, struct sockaddr_in * remote, unsigned int remote_length) {
-  int nbytes;
-  uint16_t offset;
+void chunkwritetosocket(int sock, struct packet *sent_pkt, struct packet *recv_pkt, u_short flag, u_char *payload, struct sockaddr_in * remote, socklen_t remote_length) {
+  ssize_t nbytes;
+  u_short offset;
   FILE * fp;
-  schar buff[PAYLOAD_SIZE];
+  u_char buff[PAYLOAD_SIZE];
 
+  DEBUGS1("Reading from file and writing to socket");
   fp = fopen(payload, "rb");
-  while( ( offset = fread(buff, sizeof(schar), PAYLOAD_SIZE, fp) ) != 0){
-  
-    nbytes = sendpkt(sock, send_pkt, WRITE, recv_pkt->hdr.seq_id + 1, offset, buff, remote, remote_length);
-    nbytes = waitforpkt(sock, send_pkt, recv_pkt, remote, &remote_length, remote, remote_length);
+  while( ( offset = fread(buff, sizeof(u_char), PAYLOAD_SIZE, fp) ) != 0){
+    nbytes = sendpkt(sock, sent_pkt, WRITE, recv_pkt->hdr.seq_id + 1, offset, buff, remote, remote_length);
+
+    DEBUGN("\t\tData Packet Sent", sent_pkt->hdr.seq_id); 
+    debug_print_pkt(sent_pkt);
+    
+    nbytes = waitforpkt(sock, sent_pkt, recv_pkt, remote, remote_length);
+
+    DEBUGN("\t\tACK Packet Recv", recv_pkt->hdr.seq_id);
+    debug_print_pkt(recv_pkt);
   }
 
   fclose(fp);

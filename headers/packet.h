@@ -12,11 +12,11 @@
 #define READ 1
 #define WRITE 2
 
-typedef unsigned char schar;
+typedef unsigned char u_char;
 struct header {
-  uint16_t seq_id; // id of the packet sent TODO: what if number of packets overflow ?
-  uint16_t offset; // number of bytes to read from packet payload offset < PAYLOAD_SIZE means last packet and operation is completed
-  uint16_t flag;
+  u_short seq_id; // id of the packet sent TODO: what if number of packets overflow ?
+  u_short offset; // number of bytes to read from packet payload offset < PAYLOAD_SIZE means last packet and operation is completed
+  u_short flag;
   /* To specify the type of packet it is
    * flag = 0 : ACK Packet
      flag = 1 : Read Packet
@@ -26,32 +26,32 @@ struct header {
      flag = 5 : Exit Packet
      flag = 6 : Unknow Packet
    */
-  uint16_t checksum; 
+  u_short checksum; 
 };
 
 struct packet {
   struct header hdr;
-  schar payload[PAYLOAD_SIZE] ;
+  u_char payload[PAYLOAD_SIZE] ;
 };
 
-void fill_packet(struct packet*, uint16_t, uint16_t, uint16_t, schar *);
+void fill_packet(struct packet*, u_short, u_short, u_short, u_char *);
 
-void fill_header(struct packet*, uint16_t, uint16_t, uint16_t);
+void fill_header(struct packet*, u_short, u_short, u_short);
 
-void fill_payload(struct packet*, schar *);
+void fill_payload(struct packet*, u_char *);
 
-void getfilenamefrompkt(schar *, struct packet *);
+void getfilenamefrompkt(u_char *, struct packet *);
 
-int sendpkt(int, void*, uint16_t, uint16_t, uint16_t, schar*,  struct sockaddr_in*, unsigned int);
+ssize_t sendpkt(int, struct packet*, u_short, u_short, u_short, u_char*, struct sockaddr_in*, socklen_t);
 
-int waitforpkt(int, void*, void *, struct sockaddr_in *, unsigned int*, struct sockaddr_in *, unsigned int);
+ssize_t waitforpkt(int, struct packet*, struct packet *, struct sockaddr_in *, socklen_t);
 
-int sendwithsock(int, void*, struct sockaddr_in*, unsigned int); 
+ssize_t sendwithsock(int, struct packet*, struct sockaddr_in*, socklen_t); 
 
-int recvwithsock(int, void*, struct sockaddr_in*, unsigned int*);
+ssize_t recvwithsock(int, struct packet*, struct sockaddr_in*, socklen_t*);
 
-void chunkreadfromsocket(int, struct packet*, struct packet*, uint16_t, uint16_t, uint16_t, schar*, struct sockaddr_in*, unsigned int, struct sockaddr_in*, unsigned int *); 
+void chunkreadfromsocket(int, struct packet*, struct packet*, u_short, u_short, u_short, u_char*, struct sockaddr_in*, socklen_t); 
 
-void chunkwritetosocket(int, struct packet*, struct packet*, uint16_t, schar*, struct sockaddr_in*, unsigned int);
+void chunkwritetosocket(int, struct packet*, struct packet*, u_short, u_char*, struct sockaddr_in*, unsigned int);
 
 #endif

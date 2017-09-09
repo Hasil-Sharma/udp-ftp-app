@@ -24,8 +24,8 @@ int main(int argc, char *argv[]){
   
   int nbytes, sock, read_line;
   char command[MAXBUFSIZE], *file_name;
-  unsigned int remote_length, from_addr_length;
-  uint16_t seq_id;
+  socklen_t remote_length, from_addr_length;
+  u_short seq_id;
   struct sockaddr_in remote, from_addr;
   struct packet send_pkt, recv_pkt;
   FILE * fp;
@@ -52,7 +52,7 @@ int main(int argc, char *argv[]){
   tv.tv_sec = 5;  /* 30 Secs Timeout */
   tv.tv_usec = 0;  // Not init'ing this can cause strange errors
   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
-   
+
   while(flag){
 
       bzero(&command, sizeof(command));
@@ -70,22 +70,7 @@ int main(int argc, char *argv[]){
           
           seq_id = 0;
           file_name = get_second_string(command);
-
-          chunkreadfromsocket(sock, &send_pkt, &recv_pkt, READ, seq_id, 0, file_name, &remote, remote_length, &from_addr, &from_addr_length);
-
-
-          /*nbytes = sendpkt(sock, &send_pkt, READ, seq_id++, 0, file_name, &remote, remote_length);*/
-          /*DEBUGN("Sent Bytes to Server", nbytes);*/
-          /*nbytes = waitforpkt(sock, &send_pkt, &recv_pkt, &from_addr, &from_addr_length, &remote, remote_length);*/
-          /*fp = fopen(file_name, "wb");*/
-          /*while(TRUE){*/
-            /*fwrite(recv_pkt.payload, sizeof(schar), recv_pkt.hdr.offset, fp);*/
-            /*if (recv_pkt.hdr.offset < PAYLOAD_SIZE) break;*/
-            /*// send ACK for Data Packt : seq_id*/
-            /*nbytes = sendpkt(sock, &send_pkt, ACK, seq_id++, 0,  NULL, &remote, remote_length);*/
-            /*nbytes = waitforpkt(sock, &send_pkt, &recv_pkt, &from_addr, &from_addr_length, &remote, remote_length);*/
-          /*}*/
-          /*DEBUGS1("File Received");*/
+          chunkreadfromsocket(sock, &send_pkt, &recv_pkt, READ, seq_id, 0, file_name, &remote, remote_length);
 
         } else if (strncasecmp(command, "put ", 4) == 0){
           
