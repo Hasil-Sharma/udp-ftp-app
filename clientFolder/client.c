@@ -22,12 +22,13 @@
 
 int main(int argc, char *argv[]){
   
-  int nbytes, sock, read_line;
+  int sock, read_line;
+  ssize_t nbytes;
   char command[MAXBUFSIZE], *file_name;
   socklen_t remote_length, from_addr_length;
   u_short seq_id;
   struct sockaddr_in remote, from_addr;
-  struct packet send_pkt, recv_pkt;
+  struct packet sent_pkt, recv_pkt;
   FILE * fp;
   int flag = TRUE, flag_connection = TRUE;
 
@@ -56,7 +57,7 @@ int main(int argc, char *argv[]){
   while(flag){
 
       bzero(&command, sizeof(command));
-      bzero(&send_pkt, sizeof(send_pkt));
+      bzero(&sent_pkt, sizeof(sent_pkt));
       bzero(&recv_pkt, sizeof(recv_pkt));
 
       fprintf(stdout, ">>> ");
@@ -70,60 +71,41 @@ int main(int argc, char *argv[]){
           
           seq_id = 0;
           file_name = get_second_string(command);
-          chunkreadfromsocket(sock, &send_pkt, &recv_pkt, READ, seq_id, 0, file_name, &remote, remote_length);
+
+          // Sending READ Packet
+          DEBUGS1("\t\t READ Packet Sent");
+          nbytes = sendpkt(sock, &sent_pkt, READ, seq_id, strlen(file_name), file_name, &remote, remote_length);
+          debug_print_pkt(&sent_pkt);
+          chunkreadfromsocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
 
         } else if (strncasecmp(command, "put ", 4) == 0){
           
-          /*seq_id = 0;*/
-          /*fill_header(&send_pkt, 2, seq_id);  */
-          
-          /*nbytes = sendwithsock(sock, "1", &remote, remote_length);*/
-          /*DEBUGN("Sent Bytes to Server", nbytes);*/
-          /*nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);*/
-          /*buff[nbytes] = '\0';*/
-          /*fprintf(stdout, "<<< %s\n", buff);*/
+          seq_id = 0;
+          file_name = get_second_string(command);
+
+          // Sending WRITE Request
+
+          DEBUGS1("\t\t WRITE Packet Sent");
+          nbytes = sendpkt(sock, &sent_pkt, WRITE, seq_id, strlen(file_name), file_name, &remote, remote_length);
+
+          debug_print_pkt(&sent_pkt);
+          // Waiting for ACK Packet
+          waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length);
+          DEBUGS1("\t\t ACK Packet Received");
+          debug_print_pkt(&recv_pkt);
+          chunkwritetosocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
         
         } else if (strncasecmp(command, "delete ", 7) == 0){
 
-          /*seq_id = 0;*/
-          /*fill_header(&send_pkt, 3, seq_id);  */
-          
-          /*nbytes = sendwithsock(sock, "2", &remote, remote_length);*/
-          /*DEBUGN("Sent Bytes to Server", nbytes);*/
-          /*nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);*/
-          /*buff[nbytes] = '\0';*/
-          /*fprintf(stdout, "<<< %s\n", buff);*/
         
         } else if (strcasecmp(command, "ls") == 0){
 
-          /*seq_id = 0;*/
-          /*fill_header(&send_pkt, 4, seq_id);  */
-          
-          /*nbytes = sendwithsock(sock, "3", &remote, remote_length);*/
-          /*DEBUGN("Sent Bytes to Server", nbytes);*/
-          /*nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);*/
-          /*buff[nbytes] = '\0';*/
-          /*fprintf(stdout, "<<< %s\n", buff);*/
         
         } else if (strcasecmp(command, "exit") == 0){
           
-          /*seq_id = 0;*/
-          /*fill_header(&send_pkt, 5, seq_id);  */
-          
-          /*nbytes = sendwithsock(sock, "4", &remote, remote_length);*/
-          /*DEBUGN("Sent Bytes to Server", nbytes);*/
-          /*flag_connection = FALSE;*/
 
         } else {
 
-          /*seq_id = 0;*/
-          /*fill_header(&send_pkt, 6, seq_id);  */
-          
-          /*nbytes = sendwithsock(sock, command, &remote, remote_length);*/
-          /*DEBUGN("Sent Bytes to Server", nbytes);*/
-          /*nbytes = recvwithsock(sock, buff, &from_addr, &from_addr_length);*/
-          /*buff[nbytes] = '\0';*/
-          /*fprintf(stdout, "<<< %s\n", buff);*/
 
         }
 

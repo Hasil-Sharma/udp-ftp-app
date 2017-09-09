@@ -21,10 +21,12 @@
 #define FALSE 0
 int main(int argc, char *argv[]){
 
-  int sock, flag = TRUE, nbytes;
+  int sock, flag = TRUE; 
+  ssize_t nbytes;
+  u_short seq_id; 
   struct sockaddr_in sin, remote;
   socklen_t remote_length, offset;
-  u_char buff[MAXBUFSIZE];
+  u_char file_name[MAXBUFSIZE];
   struct packet sent_pkt, recv_pkt;
   FILE *fp;
 
@@ -48,19 +50,28 @@ int main(int argc, char *argv[]){
     exit(1);
   }
 
+  struct timeval tv;
+  tv.tv_sec = 5;  /* 30 Secs Timeout */
+  tv.tv_usec = 0;  // Not init'ing this can cause strange errors
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
   
   while(flag){
 
     bzero(&remote, sizeof(remote));
-    bzero(buff, sizeof(buff));
+    bzero(file_name, sizeof(file_name));
     remote_length = sizeof(remote);
     bzero(&recv_pkt, sizeof(recv_pkt)); 
     bzero(&sent_pkt, sizeof(sent_pkt));
 
-    // This will keep on blocking in case the messages are lost while in flight
 
-    nbytes = recvwithsock(sock, &recv_pkt, &remote, &remote_length);
-    
+    // Handle the time out issue
+    while (TRUE){
+
+      nbytes = recvwithsock(sock, &recv_pkt, &remote, &remote_length);
+      if(nbytes > 0) break;
+
+    }
+
     DEBUGS1("Request Packet Received"); 
     debug_print_pkt(&recv_pkt);
     if (recv_pkt.hdr.flag == READ) {
@@ -68,13 +79,30 @@ int main(int argc, char *argv[]){
       if (recv_pkt.hdr.seq_id == 0) {
         DEBUGS1("\t\tRequest is GET");
         // Get name of the file from buffer
-        getfilenamefrompkt(buff, &recv_pkt);
-        chunkwritetosocket(sock, &sent_pkt, &recv_pkt, WRITE, buff, &remote, remote_length);
+        getfilenamefrompkt(file_name, &recv_pkt);
+        chunkwritetosocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
         
       } 
 
+    }else if(recv_pkt.hdr.flag == WRITE) {
+     
+      if (recv_pkt.hdr.seq_id == 0) {
+
+        seq_id = recv_pkt.hdr.seq_id; 
+
+        DEBUGS1("\t\tRequest is PUT");
+        getfilenamefrompkt(file_name, &recv_pkt);
+
+        // Send ACK for WRITE Packet from Client
+        nbytes = sendpkt(sock, &sent_pkt, ACK, seq_id, 0, NULL, &remote, remote_length);
+        DEBUGS1("\t\t ACK Packet Sent");
+        debug_print_pkt(&sent_pkt);
+        chunkreadfromsocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
+
+      }
+
     } else {
-    flag = FALSE;
+      flag = FALSE;
     } 
   }
 

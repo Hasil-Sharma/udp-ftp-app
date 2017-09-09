@@ -50,8 +50,8 @@ ssize_t sendwithsock(int, struct packet*, struct sockaddr_in*, socklen_t);
 
 ssize_t recvwithsock(int, struct packet*, struct sockaddr_in*, socklen_t*);
 
-void chunkreadfromsocket(int, struct packet*, struct packet*, u_short, u_short, u_short, u_char*, struct sockaddr_in*, socklen_t); 
+void chunkreadfromsocket(int, struct packet*, struct packet*, u_char*, struct sockaddr_in*, socklen_t); 
 
-void chunkwritetosocket(int, struct packet*, struct packet*, u_short, u_char*, struct sockaddr_in*, unsigned int);
+void chunkwritetosocket(int, struct packet*, struct packet*, u_char*, struct sockaddr_in*, socklen_t);
 
 #endif
