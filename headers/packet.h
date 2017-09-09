@@ -35,14 +35,23 @@ struct packet {
 };
 
 void fill_packet(struct packet*, uint16_t, uint16_t, uint16_t, schar *);
+
 void fill_header(struct packet*, uint16_t, uint16_t, uint16_t);
+
 void fill_payload(struct packet*, schar *);
 
 void getfilenamefrompkt(schar *, struct packet *);
 
 int sendpkt(int, void*, uint16_t, uint16_t, uint16_t, schar*,  struct sockaddr_in*, unsigned int);
+
 int waitforpkt(int, void*, void *, struct sockaddr_in *, unsigned int*, struct sockaddr_in *, unsigned int);
+
 int sendwithsock(int, void*, struct sockaddr_in*, unsigned int); 
+
 int recvwithsock(int, void*, struct sockaddr_in*, unsigned int*);
+
+void chunkreadfromsocket(int, struct packet*, struct packet*, uint16_t, uint16_t, uint16_t, schar*, struct sockaddr_in*, unsigned int, struct sockaddr_in*, unsigned int *); 
+
+void chunkwritetosocket(int, struct packet*, struct packet*, uint16_t, schar*, struct sockaddr_in*, unsigned int);
 
 #endif

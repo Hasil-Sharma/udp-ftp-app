@@ -70,15 +70,18 @@ int main(int argc, char *argv[]){
 
         // Get name of the file from buffer
         getfilenamefrompkt(buff, &recv_pkt);
-        fp = fopen(buff, "rb");
-        while(( offset = fread(buff, sizeof(schar), PAYLOAD_SIZE, fp)) != 0){
-          // Returned data packet is received seq_id + 1
-          nbytes = sendpkt(sock, &send_pkt, WRITE, recv_pkt.hdr.seq_id + 1, offset, buff, &remote, remote_length);
-          nbytes = waitforpkt(sock, &send_pkt, &recv_pkt, &remote, &remote_length, &remote, remote_length);
-        }
+        
+        chunkwritetosocket(sock, &send_pkt, &recv_pkt, WRITE, buff, &remote, remote_length);
+        
+        /*fp = fopen(buff, "rb");*/
+        /*while(( offset = fread(buff, sizeof(schar), PAYLOAD_SIZE, fp)) != 0){*/
+          /*// Returned data packet is received seq_id + 1*/
+          /*nbytes = sendpkt(sock, &send_pkt, WRITE, recv_pkt.hdr.seq_id + 1, offset, buff, &remote, remote_length);*/
+          /*nbytes = waitforpkt(sock, &send_pkt, &recv_pkt, &remote, &remote_length, &remote, remote_length);*/
+        /*}*/
 
-        DEBUGS1("File Sent");
-        fclose(fp);
+        /*DEBUGS1("File Sent");*/
+        /*fclose(fp);*/
 
       } 
 

@@ -49,6 +49,7 @@ int sendpkt(int sock, void *pkt, uint16_t flag, uint16_t seq_id, uint16_t offset
 }
 
 int waitforpkt(int sock, void *prev_pkt,void *pkt, struct sockaddr_in *from_addr, unsigned int * from_addr_length_r, struct sockaddr_in *remote, unsigned int remote_length){
+  // TODO: Implement check for the packet received to be the one we expect
   int nbytes;
   DEBUGS1("Wait for Pkt Method : Start");
   while(1) {
@@ -78,4 +79,40 @@ int recvwithsock(int sock, void *pkt, struct sockaddr_in * from_addr, unsigned i
   // This will keep on blocking in case the messages are lost while in flight
   return recvfrom(sock, pkt, PACKET_SIZE, 0, (struct sockaddr *)from_addr, from_addr_length_r);
 }
+void chunkreadfromsocket(int sock, struct packet *send_pkt, struct packet *recv_pkt, uint16_t flag, uint16_t seq_id, uint16_t offset, schar *payload, struct sockaddr_in *remote, unsigned int remote_length, struct sockaddr_in *from_addr, unsigned int * from_addr_length_r){
 
+  int nbytes;
+  FILE *fp;
+
+  nbytes = sendpkt(sock, send_pkt, READ, seq_id++, offset, payload, remote, remote_length);
+  nbytes = waitforpkt(sock, send_pkt, recv_pkt, from_addr, from_addr_length_r, remote, remote_length);
+
+  fp = fopen(payload, "wb");
+
+  while(1){
+    fwrite(recv_pkt->payload, sizeof(schar), recv_pkt->hdr.offset, fp);
+    if (recv_pkt->hdr.offset < PAYLOAD_SIZE) break;
+    nbytes = sendpkt(sock, send_pkt, ACK, seq_id++, 0, NULL, remote, remote_length);
+    nbytes = waitforpkt(sock, send_pkt, recv_pkt, from_addr, from_addr_length_r, remote, remote_length);
+  }
+
+  // Server should keep on sending the last packet
+  fclose(fp);
+}
+
+void chunkwritetosocket(int sock, struct packet *send_pkt, struct packet *recv_pkt, uint16_t flag, schar *payload, struct sockaddr_in * remote, unsigned int remote_length) {
+  int nbytes;
+  uint16_t offset;
+  FILE * fp;
+  schar buff[PAYLOAD_SIZE];
+
+  fp = fopen(payload, "rb");
+  while( ( offset = fread(buff, sizeof(schar), PAYLOAD_SIZE, fp) ) != 0){
+  
+    nbytes = sendpkt(sock, send_pkt, WRITE, recv_pkt->hdr.seq_id + 1, offset, buff, remote, remote_length);
+    nbytes = waitforpkt(sock, send_pkt, recv_pkt, remote, &remote_length, remote, remote_length);
+  }
+
+  fclose(fp);
+
+}
