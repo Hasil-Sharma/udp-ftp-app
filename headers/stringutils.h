@@ -3,7 +3,8 @@
 #ifndef STRINGUTILS_H
 #define STRINGUTILS_H
 
-char * get_second_string(char * );
+typedef unsigned char schar;
+schar * get_second_string(schar * );
 
 #endif
 

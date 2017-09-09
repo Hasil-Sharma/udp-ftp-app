@@ -7,10 +7,43 @@
 #include <sys/socket.h>
 #include <error.h>
 
+void fill_packet(struct packet* pkt, uint16_t flag, uint16_t seq_id, uint16_t offset, schar *payload){
+	fill_header(pkt, flag, seq_id, offset);
+	fill_payload(pkt, payload);
+}
+void fill_header(struct packet* pkt, uint16_t flag, uint16_t seq_id, uint16_t offset){
+  bzero(pkt, sizeof(struct packet));
+  pkt->hdr.offset = offset;
+  pkt->hdr.seq_id = seq_id;
+  pkt->hdr.flag = flag;
+}
 
-int sendpkt(int sock, void *pkt, int flag, unsigned int seq_id, char * payload,  struct sockaddr_in *remote_r, unsigned int remote_length){
+void fill_payload(struct packet* pkt, schar *payload){
+  bzero(pkt->payload, sizeof(pkt->payload));
+  if (pkt->hdr.flag == ACK) { 
+    // Do Nothing
+  } else if (pkt->hdr.flag == READ) {
+    // Sending file name in the packet; only for seq_id == 0
+    if (pkt->hdr.seq_id == 0) {
+      strcpy(pkt->payload, payload);
+      pkt->hdr.offset = (uint16_t) strlen(payload); // get filename.txt 4:"get " 
+    }
+  } else if (pkt->hdr.flag == WRITE) {
+      memcpy(pkt->payload, payload, pkt->hdr.offset);
+  } else if (pkt->hdr.flag == 3) {
+  } else if (pkt->hdr.flag == 4) {
+  } else if (pkt->hdr.flag == 5) {
+  } else if (pkt->hdr.flag == 6) {
+  } 
+}
+
+void getfilenamefrompkt(schar *buff, struct packet * pkt){
+  strncpy(buff, pkt->payload, pkt->hdr.offset);
+}
+
+int sendpkt(int sock, void *pkt, uint16_t flag, uint16_t seq_id, uint16_t offset, schar * payload,  struct sockaddr_in *remote_r, unsigned int remote_length){
   
-  fill_packet(pkt, flag, seq_id, payload);
+  fill_packet(pkt, flag, seq_id, offset, payload);
   return sendwithsock(sock, pkt, remote_r, remote_length);
 
 }
@@ -44,34 +77,5 @@ int recvwithsock(int sock, void *pkt, struct sockaddr_in * from_addr, unsigned i
   // recvfrom stores the information of sender in from_addr
   // This will keep on blocking in case the messages are lost while in flight
   return recvfrom(sock, pkt, PACKET_SIZE, 0, (struct sockaddr *)from_addr, from_addr_length_r);
-}
-
-void fill_packet(struct packet* pkt, short int flag, short int seq_id, char *payload){
-	fill_header(pkt, flag, seq_id);
-	fill_payload(pkt, payload);
-}
-void fill_header(struct packet* pkt, short int flag, short int seq_id){
-  bzero(pkt, sizeof(struct packet));
-  pkt->hdr.seq_id = seq_id;
-  pkt->hdr.flag = flag;
-}
-
-void fill_payload(struct packet* pkt, char *payload){
-  bzero(pkt->payload, sizeof(pkt->payload));
-  if (pkt->hdr.flag == ACK) { 
-    // Do Nothing
-  } else if (pkt->hdr.flag == READ) {
-    // Sending file name in the packet; only for seq_id == 0
-    if (pkt->hdr.seq_id == 0) {
-      strcpy(pkt->payload, get_second_string(payload));
-      pkt->hdr.offset = (unsigned short) (strlen(payload) - 4); // get filename.txt 4:"get "
-    
-    }
-  } else if (pkt->hdr.flag == 2) {
-  } else if (pkt->hdr.flag == 3) {
-  } else if (pkt->hdr.flag == 4) {
-  } else if (pkt->hdr.flag == 5) {
-  } else if (pkt->hdr.flag == 6) {
-  } 
 }
 

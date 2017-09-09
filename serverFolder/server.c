@@ -19,63 +19,76 @@
 #define MAXBUFSIZE 100
 #define TRUE 1
 #define FALSE 0
-
 int main(int argc, char *argv[]){
 
- int sock, flag = TRUE, nbytes;
- struct sockaddr_in sin, remote;
- unsigned int remote_length;
- char buff[MAXBUFSIZE], command[MAXBUFSIZE];
- struct packet send_pkt, recv_pkt;
+  int sock, flag = TRUE, nbytes;
+  struct sockaddr_in sin, remote;
+  unsigned int remote_length, offset;
+  schar buff[MAXBUFSIZE];
+  struct packet send_pkt, recv_pkt;
+  FILE *fp;
 
- if (argc != 2){
-   fprintf(stderr, "USAGE : <port>\n"); // TODO: make it print via stderr
-   exit(1);
- }
+  if (argc != 2){
+    fprintf(stderr, "USAGE : <port>\n"); // TODO: make it print via stderr
+    exit(1);
+  }
 
- bzero(&sin, sizeof(sin));
- sin.sin_family = AF_INET;
- sin.sin_port = htons(atoi(argv[1])); // TODO: make sure the user enter a number
- sin.sin_addr.s_addr = INADDR_ANY;
+  bzero(&sin, sizeof(sin));
+  sin.sin_family = AF_INET;
+  sin.sin_port = htons(atoi(argv[1])); // TODO: make sure the user enter a number
+  sin.sin_addr.s_addr = INADDR_ANY;
 
- if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-   fprintf(stderr, "unable to bind to socket\n"); 
-   exit(1);
- }
+  if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    fprintf(stderr, "unable to bind to socket\n"); 
+    exit(1);
+  }
 
- if(bind(sock, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
-   fprintf(stderr, "unable to bind to socket\n"); 
-   exit(1);
- }
+  if(bind(sock, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
+    fprintf(stderr, "unable to bind to socket\n"); 
+    exit(1);
+  }
 
- bzero(&remote, sizeof(remote));
- bzero(buff, sizeof(buff));
- bzero(command, sizeof(command));
+  
+  while(flag){
 
- remote_length = sizeof(remote);
- while(flag){
+    bzero(&remote, sizeof(remote));
+    bzero(buff, sizeof(buff));
+    remote_length = sizeof(remote);
+    bzero(&recv_pkt, sizeof(recv_pkt)); 
+    bzero(&send_pkt, sizeof(send_pkt));
 
-      // This will keep on blocking in case the messages are lost while in flight
+    // This will keep on blocking in case the messages are lost while in flight
 
     nbytes = recvwithsock(sock, &recv_pkt, &remote, &remote_length);
 
     DEBUGS1("Packet Recv");
     debug_print_pkt(&recv_pkt);
 
-		switch(recv_pkt.hdr.flag) {
-			case 1 :
-				/* Packet is a get <file_name.txt> command
-					 Payload has the file name */
-				fill_header(&send_pkt, ACK, recv_pkt.hdr.seq_id);
-        DEBUGS1("Packet Sent");
-				debug_print_pkt(&send_pkt);
-				nbytes = sendwithsock(sock, &send_pkt, &remote, remote_length);
-				break;
-		} 
- }
+    if (recv_pkt.hdr.flag == READ) {
 
- close(sock);
- return 0;
+      if (recv_pkt.hdr.seq_id == 0) {
+
+        // Get name of the file from buffer
+        getfilenamefrompkt(buff, &recv_pkt);
+        fp = fopen(buff, "rb");
+        while(( offset = fread(buff, sizeof(schar), PAYLOAD_SIZE, fp)) != 0){
+          // Returned data packet is received seq_id + 1
+          nbytes = sendpkt(sock, &send_pkt, WRITE, recv_pkt.hdr.seq_id + 1, offset, buff, &remote, remote_length);
+          nbytes = waitforpkt(sock, &send_pkt, &recv_pkt, &remote, &remote_length, &remote, remote_length);
+        }
+
+        DEBUGS1("File Sent");
+        fclose(fp);
+
+      } 
+
+    } else {
+    flag = FALSE;
+    } 
+  }
+
+  close(sock);
+  return 0;
 }
 
 char *getdir(){
