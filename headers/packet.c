@@ -50,14 +50,27 @@ ssize_t sendpkt(int sock, struct packet *pkt, u_short flag, u_short seq_id, u_sh
 
 }
 
-ssize_t waitforpkt(int sock, struct packet *prev_pkt, struct packet *pkt, struct sockaddr_in *remote, socklen_t remote_length){
+ssize_t waitforpkt(int sock, struct packet *prev_pkt, struct packet *pkt, struct sockaddr_in *remote, socklen_t remote_length, int timeout_flag){
   // TODO: Implement check for the packet received to be the one we expect
   ssize_t nbytes;
-  while(1) {
+
+  if (timeout_flag) setsocktimeout(sock);
+
+  while(TRUE) {
     nbytes = recvwithsock(sock, pkt, remote, &remote_length);
     // TODO: Check if the correct packet is received
     if(nbytes == PACKET_SIZE){ 
       break;
+      /*// PACKET_SIZE is correct*/
+      /*if (prev_pkt->hdr.flag == WRITE && pkt->hdr.flag == ACK){*/
+        /*// Case when prev_pkt was a data packet */
+        /*// pkt should be ACK with same seq_id*/
+        /*if (prev_pkt->hdr.seq_id == pkt->hdr.seq_id) break;*/
+      /*} else if (prev_pkt->hdr.flag == ACK && pkt->hdr.flag == WRITE){*/
+        /*// Case when prev_pkt was a ACK packet*/
+        /*// pkt should be a data packet*/
+        /*if(prev_pkt->hdr.seq_id + 1 == pkt->hdr.seq_id) break;*/
+      /*}*/
     }
     else {
       // For the case when socket timesout
@@ -65,6 +78,8 @@ ssize_t waitforpkt(int sock, struct packet *prev_pkt, struct packet *pkt, struct
       nbytes = sendwithsock(sock, prev_pkt, remote, remote_length);
     }
   }
+
+  if (timeout_flag) unsetsocktimeout(sock);
   return nbytes;
 }
 
@@ -86,29 +101,62 @@ ssize_t recvwithsock(int sock, struct packet* pkt, struct sockaddr_in* from_addr
 
 
 void chunkreadfromsocket(int sock, struct packet *sent_pkt, struct packet *recv_pkt, u_char *file_name, struct sockaddr_in *remote, socklen_t remote_length){
+  
+  /* GET CLIENT
+   * Initially: 
+   * - sent_pkt: READ Req Data Packet
+   * - recv_pkt: First Data Packet
+   * */
+
+  /* PUT RESPONSE SERVER
+   * Intially:
+   * - sent_pkt: ACK to WRITE Req Packet
+   * - recv_pkt: WRITE Req Packet
+   * */
+
   u_short seq_id;
   ssize_t nbytes;
   FILE *fp;
   fp = fopen(file_name, "wb");
 
-  while(1){
-    // Waiting for next Data Packet
-    nbytes = waitforpkt(sock, sent_pkt, recv_pkt, remote, remote_length);
-    
-    DEBUGN("\t\tData Packet Recv", recv_pkt->hdr.seq_id);
-    debug_print_pkt(recv_pkt);
+  while(TRUE){
 
+    /* GET CLIENT
+     *
+     * Initially :
+     * - Waiting for Data Packet in reply to READ Req
+     * - Resend READ Req is not Data Packet is received
+     *
+     * Later :
+     * - Waiting for Data Packet in reply to ACK Sent
+     * - !(Resend ACK if no Data Packet is received)
+     * */
+
+    /* PUT RESPONSE SERVER
+     * - Waiting for Data Packet in reply to ACK Sent
+     * - !(Resend ACK if no Data Packet is received)
+     * */
+
+    // Writing the first Data Packet Received
     fwrite(recv_pkt->payload, sizeof(u_char), recv_pkt->hdr.offset, fp);
 
     seq_id = recv_pkt->hdr.seq_id; 
     
-    // Packet sent is ACK for Data Packet Recv 
+    // Send ACK Packet for Data Packet Recv (both have same seq id) 
     nbytes = sendpkt(sock, sent_pkt, ACK, seq_id, 0, NULL, remote, remote_length);
     
     DEBUGN("\t\tACK Packet Sent", seq_id);
     debug_print_pkt(sent_pkt);
 
     if (recv_pkt->hdr.offset < PAYLOAD_SIZE) break;
+
+    // Wait for next data packet - Without timeout
+    // Do not resend the ACK if no data packet received
+    nbytes = waitforpkt(sock, sent_pkt, recv_pkt, remote, remote_length, FALSE);
+
+    DEBUGN("\t\tData Packet Recv", recv_pkt->hdr.seq_id);
+    debug_print_pkt(recv_pkt);
+
   }
 
   // Server should keep on sending the last packet
@@ -116,31 +164,82 @@ void chunkreadfromsocket(int sock, struct packet *sent_pkt, struct packet *recv_
 }
 
 void chunkwritetosocket(int sock, struct packet *sent_pkt, struct packet *recv_pkt, u_char *file_name, struct sockaddr_in *remote, socklen_t remote_length) {
-  
+
+  /* PUT CLIENT
+   *
+   * Initially:
+   * - sent_pkt : zero filled packet
+   * - recv_pkt : ACK for WRITE Packet sent
+   * */  
+
+  /* GET RESPONSE SERVER
+   *
+   * Initially:
+   * - sent_pkt : zero filled packet
+   * - recv_pkt : READ Req
+   * */
+
   ssize_t nbytes;
   u_short offset, seq_id;
   FILE * fp;
   u_char payload_buffer[PAYLOAD_SIZE];
-
+  
   DEBUGS1("Reading from file and writing to socket");
   fp = fopen(file_name, "rb");
   while( ( offset = fread(payload_buffer, sizeof(u_char), PAYLOAD_SIZE, fp) ) != 0){
+    
+    /* PUT CLIENT
+     * - Reply ACK:seq_id with Data Packet: seq_id + 1 
+     * - Resend Data Packet: seq_id + 1 if ACK: seq_id + 1 isn't received 
+     * */
+
+    /* GET RESPONSE SERVER
+     *
+     * Initially:
+     * - Reply READ:seq_id with Data Packet: seq_id + 1
+     * - Resend Data Packet: seq_id + 1 if ACK: seq_id + 1 isn't received
+     *
+     * Later:
+     * - Reply ACK:seq_id with Data Packet: ACK:seq_id +1
+     * - Resend Data Packet: ACK:seq_id + 1 if ACK: seq_id + 1 isn't received
+     * */
 
     seq_id = recv_pkt->hdr.seq_id + 1;
 
-    // Send data packets
+    // Send Data Packet with seq_id =  ACK:seq_id + 1
     nbytes = sendpkt(sock, sent_pkt, WRITE, seq_id, offset, payload_buffer, remote, remote_length);
 
     DEBUGN("\t\tData Packet Sent", sent_pkt->hdr.seq_id); 
     debug_print_pkt(sent_pkt);
     
-    // Get ACK packets
-    nbytes = waitforpkt(sock, sent_pkt, recv_pkt, remote, remote_length);
+    // Get ACK packet for Data Packet: seq_id or resend Data Packet: seq_id 
+    nbytes = waitforpkt(sock, sent_pkt, recv_pkt, remote, remote_length, TRUE);
 
     DEBUGN("\t\tACK Packet Recv", recv_pkt->hdr.seq_id);
     debug_print_pkt(recv_pkt);
   }
 
+
   fclose(fp);
+
+}
+
+void setsocktimeout(int sock){
+  // Adding timeout
+  struct timeval tv;
+  tv.tv_sec = 5; // 5 sec time out 
+  tv.tv_usec = 0;  // Not init'ing this can cause strange errors
+  if(setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval)) != 0)
+    perror("Unable to set socket timeout");
+
+}
+
+void unsetsocktimeout(int sock){
+
+  struct timeval tv;
+  tv.tv_sec = 0; // 5 sec time out 
+  tv.tv_usec = 0;  // Not init'ing this can cause strange errors
+  if(setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval)) != 0)
+    perror("Unable to unset socket timeout");
 
 }

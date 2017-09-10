@@ -63,14 +63,7 @@ int main(int argc, char *argv[]){
     bzero(&recv_pkt, sizeof(recv_pkt)); 
     bzero(&sent_pkt, sizeof(sent_pkt));
 
-
-    // Handle the time out issue
-    while (TRUE){
-
-      nbytes = recvwithsock(sock, &recv_pkt, &remote, &remote_length);
-      if(nbytes > 0) break;
-
-    }
+    nbytes = waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length, FALSE);
 
     DEBUGS1("Request Packet Received"); 
     debug_print_pkt(&recv_pkt);
@@ -93,10 +86,15 @@ int main(int argc, char *argv[]){
         DEBUGS1("\t\tRequest is PUT");
         getfilenamefrompkt(file_name, &recv_pkt);
 
-        // Send ACK for WRITE Packet from Client
+        // Send WRITE ACK for WRITE Packet from Client
         nbytes = sendpkt(sock, &sent_pkt, ACK, seq_id, 0, NULL, &remote, remote_length);
-        DEBUGS1("\t\t ACK Packet Sent");
+
+        DEBUGS1("\t\tACK Packet Sent");
         debug_print_pkt(&sent_pkt);
+       
+        // Waiting for WRITE ACK Reponse : Data Packet 
+        // Resend WRITE ACK Reponse if no Data Packet
+        nbytes = waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length, TRUE);
         chunkreadfromsocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
 
       }

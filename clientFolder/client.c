@@ -49,10 +49,6 @@ int main(int argc, char *argv[]){
 
   if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { fprintf(stderr, "unable to create socket\n"); }
   
-  struct timeval tv;
-  tv.tv_sec = 5;  /* 30 Secs Timeout */
-  tv.tv_usec = 0;  // Not init'ing this can cause strange errors
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
 
   while(flag){
 
@@ -73,9 +69,15 @@ int main(int argc, char *argv[]){
           file_name = get_second_string(command);
 
           // Sending READ Packet
-          DEBUGS1("\t\t READ Packet Sent");
+          
+          DEBUGS1("\t\tREAD Packet Sent");
           nbytes = sendpkt(sock, &sent_pkt, READ, seq_id, strlen(file_name), file_name, &remote, remote_length);
           debug_print_pkt(&sent_pkt);
+
+          // Waiting for READ Req Response: Data Packet
+          // Resend READ Req if no Data Packet
+
+          nbytes = waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length, TRUE);
           chunkreadfromsocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
 
         } else if (strncasecmp(command, "put ", 4) == 0){
@@ -83,16 +85,21 @@ int main(int argc, char *argv[]){
           seq_id = 0;
           file_name = get_second_string(command);
 
-          // Sending WRITE Request
+          // Sending WRITE Packet
 
-          DEBUGS1("\t\t WRITE Packet Sent");
+          DEBUGS1("\t\tWRITE Packet Sent");
           nbytes = sendpkt(sock, &sent_pkt, WRITE, seq_id, strlen(file_name), file_name, &remote, remote_length);
 
           debug_print_pkt(&sent_pkt);
-          // Waiting for ACK Packet
-          waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length);
-          DEBUGS1("\t\t ACK Packet Received");
+
+          // Waiting for ACK for the WRITE Packet
+          // Resend WRITE Req if no ACK Packet received
+          
+          nbytes = waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length, TRUE);
+
+          DEBUGS1("\t\tWRITE ACK Packet Received");
           debug_print_pkt(&recv_pkt);
+
           chunkwritetosocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
         
         } else if (strncasecmp(command, "delete ", 7) == 0){
