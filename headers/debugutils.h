@@ -5,7 +5,7 @@
 #define DEBUG_UTILS_H
 
 #define DEBUGS1(s) fprintf(stdout, "DEBUG: %s\n", s)
-#define DEBUGSX(s) fprintf(stdout, "DEBUG: %x\n", s)
+#define DEBUGSX(s) fprintf(stdout, "DEBUG: %u\n", s)
 #define DEBUGN(d, s) fprintf(stdout,"DEBUG: %s: %d\n",d,s)
 #define DEBUGS(d, s) fprintf(stdout,"DEBUG: %s: %s\n",d, s)
 #define INFON(d, s) fprintf(stdout, "INFO: %s: %d\n", d, s)
