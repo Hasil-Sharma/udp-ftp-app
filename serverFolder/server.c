@@ -50,10 +50,6 @@ int main(int argc, char *argv[]){
     exit(1);
   }
 
-  struct timeval tv;
-  tv.tv_sec = 5;  /* 30 Secs Timeout */
-  tv.tv_usec = 0;  // Not init'ing this can cause strange errors
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval));
   
   while(flag){
 
