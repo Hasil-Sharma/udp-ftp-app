@@ -19,6 +19,9 @@
 #define MAXBUFSIZE 100
 #define TRUE 1
 #define FALSE 0
+
+char *getdir();
+
 int main(int argc, char *argv[]){
 
   int sock, flag = TRUE; 
@@ -26,7 +29,7 @@ int main(int argc, char *argv[]){
   u_short seq_id; 
   struct sockaddr_in sin, remote;
   socklen_t remote_length, offset;
-  u_char file_name[MAXBUFSIZE];
+  u_char file_name[MAXBUFSIZE], *buff;
   struct packet sent_pkt, recv_pkt;
   FILE *fp;
 
@@ -67,15 +70,15 @@ int main(int argc, char *argv[]){
 
       DEBUGS1("\t\tRequest is GET");
       // Get name of the file from buffer
-      getfilenamefrompkt(file_name, &recv_pkt);
+      getstringfrompayload(file_name, &recv_pkt);
       chunkwritetosocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
         
-    }else if(recv_pkt.hdr.flag == WRITE_RQ) {
+    } else if(recv_pkt.hdr.flag == WRITE_RQ) {
      
         seq_id = recv_pkt.hdr.seq_id; 
 
         DEBUGS1("\t\tRequest is PUT");
-        getfilenamefrompkt(file_name, &recv_pkt);
+        getstringfrompayload(file_name, &recv_pkt);
 
         // Send WRITE ACK for WRITE Packet from Client
         nbytes = sendpkt(sock, &sent_pkt, ACK, seq_id, 0, NULL, &remote, remote_length);
@@ -88,6 +91,18 @@ int main(int argc, char *argv[]){
         nbytes = waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length, TRUE);
         chunkreadfromsocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
 
+    } else if(recv_pkt.hdr.flag == LS_RQ) {
+      
+      seq_id = recv_pkt.hdr.seq_id;
+      buff = getdir(); 
+
+      // Send DATA Packet
+      nbytes = sendpkt(sock, &sent_pkt, WRITE, seq_id+1, strlen(buff), buff, &remote, remote_length);
+      free(buff);  
+    } else if (recv_pkt.hdr.flag == EXIT_RQ) {
+
+      DEBUGS1("\t\tRequest is EXIT");
+      flag = FALSE;
     } else {
       flag = FALSE;
     } 

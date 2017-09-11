@@ -12,10 +12,13 @@
 #define PAYLOAD_SIZE (PACKET_SIZE - HEADER_SIZE)
 
 #define NO_FLAG 0
-#define ACK 1
-#define READ_RQ 2
-#define WRITE_RQ 3
-#define WRITE 4
+#define READ_RQ 1
+#define WRITE_RQ 2
+#define LS_RQ 3
+#define DL_RQ 4
+#define EXIT_RQ 5
+#define ACK 6
+#define WRITE 7
 
 struct header {
   u_short seq_id; // id of the packet sent TODO: what if number of packets overflow ?
@@ -44,7 +47,7 @@ void fill_header(struct packet*, u_short, u_short, u_short);
 
 void fill_payload(struct packet*, u_char *);
 
-void getfilenamefrompkt(u_char *, struct packet *);
+void getstringfrompayload(u_char *, struct packet *);
 
 ssize_t sendpkt(int, struct packet*, u_short, u_short, u_short, u_char*, struct sockaddr_in*, socklen_t);
 

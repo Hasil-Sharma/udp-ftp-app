@@ -39,7 +39,7 @@ void fill_payload(struct packet* pkt, u_char *payload){
   } 
 }
 
-void getfilenamefrompkt(u_char *buff, struct packet * pkt){
+void getstringfrompayload(u_char *buff, struct packet * pkt){
   memcpy(buff, pkt->payload, pkt->hdr.offset);
 }
 
@@ -71,12 +71,14 @@ ssize_t waitforpkt(int sock, struct packet *prev_pkt, struct packet *recv_pkt, s
     if(nbytes == PACKET_SIZE){ 
       
       /*// PACKET_SIZE is correct*/
+      // TODO: Deliberate More
       if( prev_pkt->hdr.flag == NO_FLAG && (recv_pkt->hdr.flag == READ_RQ || recv_pkt->hdr.flag == WRITE_RQ) ) break; // Case-4,5
 
-      if( (prev_pkt->hdr.flag == ACK || prev_pkt->hdr.flag == READ_RQ) && recv_pkt->hdr.flag == WRITE && prev_pkt->hdr.seq_id == recv_pkt->hdr.seq_id - 1 ) break; //Case-1,2
+      if( (prev_pkt->hdr.flag == ACK || prev_pkt->hdr.flag == READ_RQ || prev_pkt->hdr.flag == LS_RQ) && recv_pkt->hdr.flag == WRITE && prev_pkt->hdr.seq_id == recv_pkt->hdr.seq_id - 1 ) break; //Case-1,2
 
       if( (prev_pkt->hdr.flag == WRITE || prev_pkt->hdr.flag == WRITE_RQ) && recv_pkt->hdr.flag == ACK && prev_pkt->hdr.seq_id == recv_pkt->hdr.seq_id ) break;
 
+      if( recv_pkt->hdr.flag == LS_RQ || recv_pkt->hdr.flag == EXIT_RQ ) break;
 
     } else if (nbytes < PACKET_SIZE && nbytes > 0) {
 
@@ -84,6 +86,7 @@ ssize_t waitforpkt(int sock, struct packet *prev_pkt, struct packet *recv_pkt, s
 
     } else {
 
+      if (prev_pkt->hdr.flag == LS_RQ) break;
       // For the case when socket timesout
       DEBUGS1("Socket timeout Sending Again");
       nbytes = sendwithsock(sock, prev_pkt, remote, remote_length);

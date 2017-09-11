@@ -24,7 +24,8 @@ int main(int argc, char *argv[]){
   
   int sock, read_line;
   ssize_t nbytes;
-  char command[MAXBUFSIZE], *file_name;
+
+  char buff[MAXBUFSIZE], *file_name;
   socklen_t remote_length, from_addr_length;
   u_short seq_id;
   struct sockaddr_in remote, from_addr;
@@ -38,7 +39,6 @@ int main(int argc, char *argv[]){
   }
 
   bzero(&remote, sizeof(remote));
-  bzero(&command, sizeof(command));
 
   remote.sin_family = AF_INET;
   remote.sin_port = htons(atoi(argv[2]));
@@ -52,26 +52,26 @@ int main(int argc, char *argv[]){
 
   while(flag){
 
-      bzero(&command, sizeof(command));
+      bzero(buff, sizeof(buff));
       bzero(&sent_pkt, sizeof(sent_pkt));
       bzero(&recv_pkt, sizeof(recv_pkt));
 
-      fprintf(stdout, ">>> ");
-      if( fgets(command, MAXBUFSIZE, stdin) != NULL && flag_connection) { 
+      fprintf(stdout, ">>>");
+      if( fgets(buff, MAXBUFSIZE, stdin) != NULL && flag_connection) { 
         
         // This does not breaks up the space delimited sentence 
         
-        command[strlen(command) - 1] = '\0'; // remove the trailing \n
+        buff[strlen(buff) - 1] = '\0'; // remove the trailing \n
 
-        if (strncasecmp(command, "get ", 4) == 0){
+        if (strncasecmp(buff, "get ", 4) == 0){
           
           seq_id = 0;
-          file_name = get_second_string(command);
-
+          
+          file_name = get_second_string(buff);
           // Sending READ Packet
           
           DEBUGS1("\t\tREAD Packet Sent");
-          nbytes = sendpkt(sock, &sent_pkt, READ, seq_id, strlen(file_name), file_name, &remote, remote_length);
+          nbytes = sendpkt(sock, &sent_pkt, READ_RQ, seq_id, strlen(file_name), file_name, &remote, remote_length);
           debug_print_pkt(&sent_pkt);
 
           // Waiting for READ Req Response: Data Packet
@@ -80,15 +80,16 @@ int main(int argc, char *argv[]){
           nbytes = waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length, TRUE);
           chunkreadfromsocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
 
-        } else if (strncasecmp(command, "put ", 4) == 0){
+        } else if (strncasecmp(buff, "put ", 4) == 0){
           
           seq_id = 0;
-          file_name = get_second_string(command);
+          file_name = get_second_string(buff);
 
+          DEBUGS1(file_name);
           // Sending WRITE Packet
 
           DEBUGS1("\t\tWRITE Packet Sent");
-          nbytes = sendpkt(sock, &sent_pkt, WRITE, seq_id, strlen(file_name), file_name, &remote, remote_length);
+          nbytes = sendpkt(sock, &sent_pkt, WRITE_RQ, seq_id, strlen(file_name), file_name, &remote, remote_length);
 
           debug_print_pkt(&sent_pkt);
 
@@ -102,15 +103,32 @@ int main(int argc, char *argv[]){
 
           chunkwritetosocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
         
-        } else if (strncasecmp(command, "delete ", 7) == 0){
+        } else if (strncasecmp(buff, "delete ", 7) == 0){
 
         
-        } else if (strcasecmp(command, "ls") == 0){
-
-        
-        } else if (strcasecmp(command, "exit") == 0){
+        } else if (strcasecmp(buff, "ls") == 0){
           
+          seq_id = 0;
 
+          nbytes = sendpkt(sock, &sent_pkt, LS_RQ, seq_id, 0, NULL, &remote, remote_length);
+
+          DEBUGS1("\t\tLS packet Sent");
+          debug_print_pkt(&sent_pkt);
+
+          // Waiting for WRITE Packet
+          
+          nbytes = waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length, TRUE);
+          
+          bzero(buff, sizeof(buff));
+          
+          getstringfrompayload(buff, &recv_pkt);
+          
+          fprintf(stdout, "%s\n", buff);
+        
+        } else if (strcasecmp(buff, "exit") == 0){
+          seq_id = 0;
+          
+          nbytes = sendpkt(sock, &sent_pkt, EXIT_RQ, seq_id, 0, NULL, &remote, remote_length);
         } else {
 
 
