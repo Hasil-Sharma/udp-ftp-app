@@ -3,9 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-schar* get_second_string(schar* string){
-  char *temp = (char *) malloc(sizeof(*string));
+char* get_second_string(char* string){
+  char *temp = (char *) malloc(sizeof(string));
   strcpy(temp, string);
   strtok(temp, " ");
-  return (schar *)strtok(NULL, " ");
+  return strtok(NULL, " ");
 }

@@ -24,7 +24,7 @@ void fill_payload(struct packet* pkt, u_char *payload){
   bzero(pkt->payload, sizeof(pkt->payload));
   if (pkt->hdr.flag == ACK) { 
     // Do Nothing
-  } else if (pkt->hdr.flag == READ) {
+  } else if (pkt->hdr.flag == READ_RQ || pkt->hdr.flag == WRITE_RQ) {
     // Sending file name in the packet; only for seq_id == 0
     if (pkt->hdr.seq_id == 0) {
       strcpy(pkt->payload, payload);
@@ -50,32 +50,44 @@ ssize_t sendpkt(int sock, struct packet *pkt, u_short flag, u_short seq_id, u_sh
 
 }
 
-ssize_t waitforpkt(int sock, struct packet *prev_pkt, struct packet *pkt, struct sockaddr_in *remote, socklen_t remote_length, int timeout_flag){
+ssize_t waitforpkt(int sock, struct packet *prev_pkt, struct packet *recv_pkt, struct sockaddr_in *remote, socklen_t remote_length, int timeout_flag){
   // TODO: Implement check for the packet received to be the one we expect
   ssize_t nbytes;
 
   if (timeout_flag) setsocktimeout(sock);
 
   while(TRUE) {
-    nbytes = recvwithsock(sock, pkt, remote, &remote_length);
+    nbytes = recvwithsock(sock, recv_pkt, remote, &remote_length);
+    
     // TODO: Check if the correct packet is received
+    
+    /* Case-1: prev_pkt: READ Req pkt, recv_pkt: Data pkt 
+     * Case-2: prev_pkt: ACK pkt, recv_pkt: Data Pkt 
+     * Case-3: prev_pkt: Data/Write Req pkt, recv_pkt: ACK Pkt
+     * Case-4: prev_pkt: NULL, recv_pkt: READ Req pkt
+     * Case-5: prev_pkt: NULL, recv_pkt: WRITE Req pkt
+     */
+
     if(nbytes == PACKET_SIZE){ 
-      break;
+      
       /*// PACKET_SIZE is correct*/
-      /*if (prev_pkt->hdr.flag == WRITE && pkt->hdr.flag == ACK){*/
-        /*// Case when prev_pkt was a data packet */
-        /*// pkt should be ACK with same seq_id*/
-        /*if (prev_pkt->hdr.seq_id == pkt->hdr.seq_id) break;*/
-      /*} else if (prev_pkt->hdr.flag == ACK && pkt->hdr.flag == WRITE){*/
-        /*// Case when prev_pkt was a ACK packet*/
-        /*// pkt should be a data packet*/
-        /*if(prev_pkt->hdr.seq_id + 1 == pkt->hdr.seq_id) break;*/
-      /*}*/
-    }
-    else {
+      if( prev_pkt->hdr.flag == NO_FLAG && (recv_pkt->hdr.flag == READ_RQ || recv_pkt->hdr.flag == WRITE_RQ) ) break; // Case-4,5
+
+      if( (prev_pkt->hdr.flag == ACK || prev_pkt->hdr.flag == READ_RQ) && recv_pkt->hdr.flag == WRITE && prev_pkt->hdr.seq_id == recv_pkt->hdr.seq_id - 1 ) break; //Case-1,2
+
+      if( (prev_pkt->hdr.flag == WRITE || prev_pkt->hdr.flag == WRITE_RQ) && recv_pkt->hdr.flag == ACK && prev_pkt->hdr.seq_id == recv_pkt->hdr.seq_id ) break;
+
+
+    } else if (nbytes < PACKET_SIZE && nbytes > 0) {
+
+      DEBUGS1("Partial Packet Received");
+
+    } else {
+
       // For the case when socket timesout
       DEBUGS1("Socket timeout Sending Again");
       nbytes = sendwithsock(sock, prev_pkt, remote, remote_length);
+
     }
   }
 
@@ -186,6 +198,9 @@ void chunkwritetosocket(int sock, struct packet *sent_pkt, struct packet *recv_p
   
   DEBUGS1("Reading from file and writing to socket");
   fp = fopen(file_name, "rb");
+
+  if (!fp) perror(file_name);
+  
   while( ( offset = fread(payload_buffer, sizeof(u_char), PAYLOAD_SIZE, fp) ) != 0){
     
     /* PUT CLIENT

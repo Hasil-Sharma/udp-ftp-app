@@ -7,12 +7,15 @@
 
 #define TRUE 1
 #define FALSE 0
-#define PACKET_SIZE 512
+#define PACKET_SIZE 1024
 #define HEADER_SIZE 8
 #define PAYLOAD_SIZE (PACKET_SIZE - HEADER_SIZE)
-#define ACK 0
-#define READ 1
-#define WRITE 2
+
+#define NO_FLAG 0
+#define ACK 1
+#define READ_RQ 2
+#define WRITE_RQ 3
+#define WRITE 4
 
 struct header {
   u_short seq_id; // id of the packet sent TODO: what if number of packets overflow ?

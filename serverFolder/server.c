@@ -63,20 +63,15 @@ int main(int argc, char *argv[]){
 
     DEBUGS1("Request Packet Received"); 
     debug_print_pkt(&recv_pkt);
-    if (recv_pkt.hdr.flag == READ) {
+    if (recv_pkt.hdr.flag == READ_RQ) {
 
-      if (recv_pkt.hdr.seq_id == 0) {
-        DEBUGS1("\t\tRequest is GET");
-        // Get name of the file from buffer
-        getfilenamefrompkt(file_name, &recv_pkt);
-        chunkwritetosocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
+      DEBUGS1("\t\tRequest is GET");
+      // Get name of the file from buffer
+      getfilenamefrompkt(file_name, &recv_pkt);
+      chunkwritetosocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
         
-      } 
-
-    }else if(recv_pkt.hdr.flag == WRITE) {
+    }else if(recv_pkt.hdr.flag == WRITE_RQ) {
      
-      if (recv_pkt.hdr.seq_id == 0) {
-
         seq_id = recv_pkt.hdr.seq_id; 
 
         DEBUGS1("\t\tRequest is PUT");
@@ -92,8 +87,6 @@ int main(int argc, char *argv[]){
         // Resend WRITE ACK Reponse if no Data Packet
         nbytes = waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length, TRUE);
         chunkreadfromsocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
-
-      }
 
     } else {
       flag = FALSE;
