@@ -4,7 +4,7 @@
 void debug_print_pkt(struct packet * pkt){
   DEBUGS1("===>Printing Pkt<===");
   debug_print_hdr(&(pkt->hdr));
-  DEBUGS1("=>Priting Payload<=");
+  DEBUGS1("=>Printing Payload<=");
   DEBUGSX(pkt->payload); 
 }
 

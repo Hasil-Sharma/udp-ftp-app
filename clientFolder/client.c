@@ -109,7 +109,6 @@ int main(int argc, char *argv[]){
         } else if (strcasecmp(buff, "ls") == 0){
           
           seq_id = 0;
-
           nbytes = sendpkt(sock, &sent_pkt, LS_RQ, seq_id, 0, NULL, &remote, remote_length);
 
           DEBUGS1("\t\tLS packet Sent");
@@ -118,17 +117,16 @@ int main(int argc, char *argv[]){
           // Waiting for WRITE Packet
           
           nbytes = waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length, TRUE);
-          
           bzero(buff, sizeof(buff));
-          
+
           getstringfrompayload(buff, &recv_pkt);
-          
           fprintf(stdout, "%s\n", buff);
         
         } else if (strcasecmp(buff, "exit") == 0){
+
           seq_id = 0;
-          
           nbytes = sendpkt(sock, &sent_pkt, EXIT_RQ, seq_id, 0, NULL, &remote, remote_length);
+
         } else {
 
 

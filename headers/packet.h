@@ -60,7 +60,19 @@ ssize_t recvwithsock(int, struct packet*, struct sockaddr_in*, socklen_t*);
 void chunkreadfromsocket(int, struct packet*, struct packet*, u_char*, struct sockaddr_in*, socklen_t); 
 
 void chunkwritetosocket(int, struct packet*, struct packet*, u_char*, struct sockaddr_in*, socklen_t);
+
 void setsocktimeout(int);
 
 void unsetsocktimeout(int);
+
+u_short getpktseqid(struct packet*);
+
+int checkreqflags(struct packet*);
+
+int checkpktflag(struct packet*, int);
+
+int checkpktwithwriteresponse(struct packet*);
+
+int checkpkwithackresponse(struct packet*);
+
 #endif
