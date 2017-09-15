@@ -8,23 +8,25 @@
 #include <error.h>
 #include <assert.h>
 
-void fill_packet(struct packet* pkt, u_short flag, u_short seq_id, u_short offset, u_char *payload){
+void fill_packet( packet* pkt, u_short flag, u_short seq_id, u_short offset, u_char *payload){
 	fill_header(pkt, flag, seq_id, offset);
   memset(pkt->payload, 0, sizeof(pkt->payload));
 	fill_payload(pkt, payload);
+	pkt->hdr.checksum = getchecksum(pkt);
 }
-void fill_header(struct packet* pkt, u_short flag, u_short seq_id, u_short offset){
-  bzero(pkt, sizeof(struct packet));
+void fill_header( packet* pkt, u_short flag, u_short seq_id, u_short offset){
+  bzero(pkt, sizeof( packet));
   pkt->hdr.offset = offset;
   pkt->hdr.seq_id = seq_id;
   pkt->hdr.flag = flag;
 }
 
-void fill_payload(struct packet* pkt, u_char *payload){
-  bzero(pkt->payload, sizeof(pkt->payload));
+void fill_payload( packet* pkt, u_char *payload){
+  
+	bzero(pkt->payload, sizeof(pkt->payload));
   if (pkt->hdr.flag == ACK) { 
     // Do Nothing
-  } else if (pkt->hdr.flag == READ_RQ || pkt->hdr.flag == WRITE_RQ) {
+  } else if (pkt->hdr.flag == READ_RQ || pkt->hdr.flag == WRITE_RQ || pkt->hdr.flag == DL_RQ) {
     // Sending file name in the packet; only for seq_id == 0
     if (pkt->hdr.seq_id == 0) {
       strcpy(pkt->payload, payload);
@@ -39,18 +41,18 @@ void fill_payload(struct packet* pkt, u_char *payload){
   } 
 }
 
-void getstringfrompayload(u_char *buff, struct packet * pkt){
+void getstringfrompayload(u_char *buff,  packet * pkt){
   memcpy(buff, pkt->payload, pkt->hdr.offset);
 }
 
-ssize_t sendpkt(int sock, struct packet *pkt, u_short flag, u_short seq_id, u_short offset, u_char * payload,  struct sockaddr_in *remote_r, socklen_t remote_length){
+ssize_t sendpkt(int sock,  packet *pkt, u_short flag, u_short seq_id, u_short offset, u_char * payload,   sockaddr_in *remote_r, socklen_t remote_length){
   
   fill_packet(pkt, flag, seq_id, offset, payload);
   return sendwithsock(sock, pkt, remote_r, remote_length);
 
 }
 
-ssize_t waitforpkt(int sock, struct packet *prev_pkt, struct packet *recv_pkt, struct sockaddr_in *remote, socklen_t remote_length, int timeout_flag){
+ssize_t waitforpkt(int sock,  packet *prev_pkt,  packet *recv_pkt,  sockaddr_in *remote, socklen_t remote_length, int timeout_flag){
   // TODO: Implement check for the packet received to be the one we expect
   ssize_t nbytes;
 
@@ -70,12 +72,12 @@ ssize_t waitforpkt(int sock, struct packet *prev_pkt, struct packet *recv_pkt, s
      * - Case-5: (Client/Server) prev_pkt: ACK recv_pkt: Data pkt with ACK:seq_id (ACK was lost or delayed)
      * - Case-6: (Client/Server) prev_pkt: Nothing recv_pkt: Data (case of last ACK sent not received, resend the ACK)
      * */
-    if(nbytes == PACKET_SIZE){ 
+    if(nbytes == PACKET_SIZE && checkcksum(recv_pkt)){ 
       
       /*// PACKET_SIZE is correct*/
       // TODO: Deliberate More
 
-      if( checkpktflag(prev_pkt, NO_FLAG) && checkreqflags(recv_pkt) ) break; // Case-1
+      if( /*checkpktflag(prev_pkt, NO_FLAG) && */checkreqflags(recv_pkt) ) break; // Case-1
 
       if( checkpktwithwriteresponse(prev_pkt) && checkpktflag(recv_pkt, WRITE))
         if(getpktseqid(recv_pkt) == getpktseqid(prev_pkt) + 1 ) break; // Case-2, 4
@@ -115,20 +117,24 @@ ssize_t waitforpkt(int sock, struct packet *prev_pkt, struct packet *recv_pkt, s
     }
   }
 
+  encdecpayload(recv_pkt->payload, recv_pkt->hdr.offset);
   if (timeout_flag) unsetsocktimeout(sock);
   return nbytes;
 }
 
 
-ssize_t sendwithsock(int sock, struct packet* pkt, struct sockaddr_in* remote, socklen_t remote_length) {
+ssize_t sendwithsock(int sock,  packet* pkt,  sockaddr_in* remote, socklen_t remote_length) {
   // TODO: surety that this command is sent as a single chunk
 
-  ssize_t nbytes = sendto(sock, pkt, PACKET_SIZE, 0, (struct sockaddr *)remote, remote_length);
+  packet pkt_temp;
+  memcpy(&pkt_temp, pkt,sizeof(packet));
+  encdecpayload(pkt_temp.payload, pkt_temp.hdr.offset); 
+  ssize_t nbytes = sendto(sock, &pkt_temp, PACKET_SIZE, 0, (struct sockaddr *)remote, remote_length);
   return nbytes;
 }
 
 
-ssize_t recvwithsock(int sock, struct packet* pkt, struct sockaddr_in* from_addr, socklen_t* from_addr_length_r) {
+ssize_t recvwithsock(int sock,  packet* pkt,  sockaddr_in* from_addr, socklen_t* from_addr_length_r) {
   // recvfrom stores the information of sender in from_addr
   // this will keep on blocking in case the messages are lost while in flight
 
@@ -137,7 +143,7 @@ ssize_t recvwithsock(int sock, struct packet* pkt, struct sockaddr_in* from_addr
 }
 
 
-void chunkreadfromsocket(int sock, struct packet *sent_pkt, struct packet *recv_pkt, u_char *file_name, struct sockaddr_in *remote, socklen_t remote_length){
+void chunkreadfromsocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char  *file_name,  sockaddr_in *remote, socklen_t remote_length){
   
   /* get client
    * initially: 
@@ -155,6 +161,7 @@ void chunkreadfromsocket(int sock, struct packet *sent_pkt, struct packet *recv_
   ssize_t nbytes;
   FILE *fp;
   fp = fopen(file_name, "wb");
+	u_char payload[PAYLOAD_SIZE];
 
   while(TRUE){
 
@@ -175,7 +182,8 @@ void chunkreadfromsocket(int sock, struct packet *sent_pkt, struct packet *recv_
      * */
 
     // writing the first data packet received
-    fwrite(recv_pkt->payload, sizeof(u_char), recv_pkt->hdr.offset, fp);
+		memcpy(payload, recv_pkt->payload, recv_pkt->hdr.offset);
+    fwrite(payload, sizeof(u_char), recv_pkt->hdr.offset, fp);
 
     seq_id = recv_pkt->hdr.seq_id; 
     
@@ -200,7 +208,7 @@ void chunkreadfromsocket(int sock, struct packet *sent_pkt, struct packet *recv_
   fclose(fp);
 }
 
-void chunkwritetosocket(int sock, struct packet *sent_pkt, struct packet *recv_pkt, u_char *file_name, struct sockaddr_in *remote, socklen_t remote_length) {
+void chunkwritetosocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char *file_name,  sockaddr_in *remote, socklen_t remote_length) {
 
   /* put client
    *
@@ -267,8 +275,8 @@ void chunkwritetosocket(int sock, struct packet *sent_pkt, struct packet *recv_p
 void setsocktimeout(int sock){
   // adding timeout
   struct timeval tv;
-  tv.tv_sec = 5; // 5 sec time out 
-  tv.tv_usec = 0;  // not init'ing this can cause strange errors
+  tv.tv_sec = 0; // 5 sec time out 
+  tv.tv_usec = 50000;  // not init'ing this can cause strange errors
   if(setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval)) != 0)
     perror("unable to set socket timeout");
 
@@ -284,25 +292,67 @@ void unsetsocktimeout(int sock){
 
 }
 
-u_short getpktseqid(struct packet* pkt){
+u_short getpktseqid( packet* pkt){
   return pkt->hdr.seq_id;
 }
 
-int checkreqflags(struct packet* pkt) {
+int checkreqflags( packet* pkt) {
   return checkpktflag(pkt, READ_RQ) || checkpktflag(pkt, WRITE_RQ) || checkpktflag(pkt, LS_RQ) || checkpktflag(pkt, EXIT_RQ) || checkpktflag(pkt, DL_RQ);
 }
 
-int checkpktflag(struct packet* pkt, int req) {
+int checkpktflag( packet* pkt, int req) {
   return pkt->hdr.flag == req;
 }
 
-int checkpkwithackresponse(struct packet* pkt){
+int checkpkwithackresponse( packet* pkt){
 
   return checkpktflag(pkt, WRITE_RQ) || checkpktflag(pkt, EXIT_RQ) || checkpktflag(pkt, DL_RQ) || checkpktflag(pkt, WRITE);
 }
 
-int checkpktwithwriteresponse(struct packet* pkt){
+int checkpktwithwriteresponse( packet* pkt){
 
   return checkpktflag(pkt, ACK) || checkpktflag(pkt, READ_RQ) || checkpktflag(pkt, LS_RQ);  
 
+}
+
+u_short getchecksum( packet* pkt){
+
+	return cksum((u_short*)pkt, sizeof(pkt)/sizeof(u_short));
+  
+}
+
+
+u_short cksum(u_short *buf, int count){
+	
+	register u_long sum = 0;
+	while (count--) {
+		sum += *buf++;
+		if (sum & 0xFFFF0000) {
+			/* carry occurred,
+			so wrap around */
+			sum &= 0xFFFF;
+			sum++;
+		}
+	}
+	return ~(sum & 0xFFFF);
+}
+
+int checkcksum( packet *pkt) {
+
+	int flag;
+	u_short recv_checksum = pkt->hdr.checksum;
+	pkt->hdr.checksum = 0;
+	flag = (recv_checksum == getchecksum(pkt)) ? TRUE : FALSE;
+	pkt->hdr.checksum = recv_checksum;
+	return flag;
+}
+
+void encdecpayload(u_char *payload, int offset){
+
+	int index;
+	u_char key = 0x32;
+
+	for(index = 0; index < offset; index++){
+		payload[index] = payload[index] ^ key;
+	}	
 }

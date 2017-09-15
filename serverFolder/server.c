@@ -29,7 +29,8 @@ int main(int argc, char *argv[]){
   u_short seq_id; 
   struct sockaddr_in sin, remote;
   socklen_t remote_length, offset;
-  u_char file_name[MAXBUFSIZE], *buff;
+  u_char  *buff;
+  char file_name[MAXBUFSIZE];
   struct packet sent_pkt, recv_pkt;
   FILE *fp;
 
@@ -92,9 +93,10 @@ int main(int argc, char *argv[]){
         chunkreadfromsocket(sock, &sent_pkt, &recv_pkt, file_name, &remote, remote_length);
 
     } else if(checkpktflag(&recv_pkt, LS_RQ)) {
-      
+
+      DEBUGS1("\t\tRequest is LS"); 
       seq_id = getpktseqid(&recv_pkt);
-      buff = getdir(); 
+      buff = (u_char *)getdir(); 
 
       // Send DATA Packet
       nbytes = sendpkt(sock, &sent_pkt, WRITE, seq_id+1, strlen(buff), buff, &remote, remote_length);
@@ -107,7 +109,20 @@ int main(int argc, char *argv[]){
       nbytes = sendpkt(sock, &sent_pkt, ACK, seq_id, 0, NULL, &remote, remote_length);
       flag = FALSE;
 
-    } else {
+    } else if (checkpktflag(&recv_pkt, DL_RQ)) {
+
+      seq_id = getpktseqid(&recv_pkt);
+
+      DEBUGS1("\t\tRequest is DELETE");
+
+      getstringfrompayload(file_name, &recv_pkt);
+      debug_print_pkt(&recv_pkt);
+      DEBUGS1(file_name);
+      if(remove(file_name) != 0){
+
+        INFOS("Deleted", file_name);
+      } 
+    }else {
       flag = FALSE;
     } 
   }
@@ -120,15 +135,16 @@ char *getdir(){
   DIR *d;
   char * result;
   result = (char *) malloc(MAXBUFSIZE*sizeof(char));
-  bzero(result, sizeof(char *));
+
+  bzero(result, MAXBUFSIZE);
   int flag = 0;
   struct dirent *dir;
-  d = opendir("./files");
+  d = opendir(".");
+
   if (d){
-
-    while ((dir = readdir(d)) != NULL){
-
-      if(strcmp(dir->d_name, ".") && strcmp(dir->d_name, "..")){
+    while ( dir = readdir(d) ){
+      // Not sure why strcmp doesn't work
+      if(strncmp(dir->d_name, ".", 1) && strcmp(dir->d_name, "..")){
 
         if(flag) strcat(result, "\t");		
 

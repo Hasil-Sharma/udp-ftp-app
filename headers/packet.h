@@ -24,15 +24,6 @@ struct header {
   u_short seq_id; // id of the packet sent TODO: what if number of packets overflow ?
   u_short offset; // number of bytes to read from packet payload offset < PAYLOAD_SIZE means last packet and operation is completed
   u_short flag;
-  /* To specify the type of packet it is
-   * flag = 0 : ACK Packet
-     flag = 1 : Read Packet
-     flag = 2 : Write/Data Packet
-     flag = 3 : Delete Packet
-     flag = 4 : List Packet
-     flag = 5 : Exit Packet
-     flag = 6 : Unknow Packet
-   */
   u_short checksum; 
 };
 
@@ -41,38 +32,49 @@ struct packet {
   u_char payload[PAYLOAD_SIZE] ;
 };
 
-void fill_packet(struct packet*, u_short, u_short, u_short, u_char *);
+typedef struct packet packet;
+typedef struct sockaddr_in sockaddr_in;
 
-void fill_header(struct packet*, u_short, u_short, u_short);
+void fill_packet( packet*, u_short, u_short, u_short, u_char *);
 
-void fill_payload(struct packet*, u_char *);
+void fill_header( packet*, u_short, u_short, u_short);
 
-void getstringfrompayload(u_char *, struct packet *);
+void fill_payload( packet*, u_char *);
 
-ssize_t sendpkt(int, struct packet*, u_short, u_short, u_short, u_char*, struct sockaddr_in*, socklen_t);
+void getstringfrompayload(u_char *,  packet *);
 
-ssize_t waitforpkt(int, struct packet*, struct packet *, struct sockaddr_in *, socklen_t, int);
+ssize_t sendpkt(int,  packet*, u_short, u_short, u_short, u_char*,  sockaddr_in*, socklen_t);
 
-ssize_t sendwithsock(int, struct packet*, struct sockaddr_in*, socklen_t); 
+ssize_t waitforpkt(int,  packet*,  packet *,  sockaddr_in *, socklen_t, int);
 
-ssize_t recvwithsock(int, struct packet*, struct sockaddr_in*, socklen_t*);
+ssize_t sendwithsock(int,  packet*,  sockaddr_in*, socklen_t); 
 
-void chunkreadfromsocket(int, struct packet*, struct packet*, u_char*, struct sockaddr_in*, socklen_t); 
+ssize_t recvwithsock(int,  packet*,  sockaddr_in*, socklen_t*);
 
-void chunkwritetosocket(int, struct packet*, struct packet*, u_char*, struct sockaddr_in*, socklen_t);
+void chunkreadfromsocket(int,  packet*,  packet*, char*,  sockaddr_in*, socklen_t); 
+
+void chunkwritetosocket(int,  packet*,  packet*, char*,  sockaddr_in*, socklen_t);
 
 void setsocktimeout(int);
 
 void unsetsocktimeout(int);
 
-u_short getpktseqid(struct packet*);
+u_short getpktseqid( packet*);
 
-int checkreqflags(struct packet*);
+int checkreqflags( packet*);
 
-int checkpktflag(struct packet*, int);
+int checkpktflag( packet*, int);
 
-int checkpktwithwriteresponse(struct packet*);
+int checkpktwithwriteresponse( packet*);
 
-int checkpkwithackresponse(struct packet*);
+int checkpkwithackresponse( packet*);
+
+u_short getchecksum( packet* );
+
+u_short cksum(u_short *, int);
+
+int checkcksum( packet *);
+
+void encdecpayload(u_char *, int offset);
 
 #endif

@@ -105,12 +105,19 @@ int main(int argc, char *argv[]){
         
         } else if (strncasecmp(buff, "delete ", 7) == 0){
 
-        
+          seq_id = 0;
+          file_name = get_second_string(buff);
+          nbytes = sendpkt(sock, &sent_pkt, DL_RQ, seq_id, strlen(file_name), file_name, &remote, remote_length);
+          
+          DEBUGS1("\t\tDELETE packet sent");
+          debug_print_pkt(&sent_pkt);
+
         } else if (strcasecmp(buff, "ls") == 0){
           
           seq_id = 0;
           nbytes = sendpkt(sock, &sent_pkt, LS_RQ, seq_id, 0, NULL, &remote, remote_length);
 
+          debug_print_pkt(&sent_pkt);
           DEBUGS1("\t\tLS packet Sent");
           debug_print_pkt(&sent_pkt);
 
@@ -126,6 +133,7 @@ int main(int argc, char *argv[]){
 
           seq_id = 0;
           nbytes = sendpkt(sock, &sent_pkt, EXIT_RQ, seq_id, 0, NULL, &remote, remote_length);
+          flag_connection = FALSE;
 
         } else {
 

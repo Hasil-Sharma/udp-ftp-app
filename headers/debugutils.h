@@ -11,7 +11,6 @@
 #define INFON(d, s) fprintf(stdout, "INFO: %s: %d\n", d, s)
 #define INFOS(d, s) fprintf(stdout, "INFO: %s: %s\n", d, s)
 
-
 void debug_print_pkt(struct packet *);
 void debug_print_hdr(struct header *);
 
