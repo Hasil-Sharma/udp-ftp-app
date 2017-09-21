@@ -225,7 +225,7 @@ void chunkwritetosocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char *fi
    * */
 
   ssize_t nbytes;
-  u_short offset, seq_id;
+  u_short offset, seq_id, prev_offset;
   FILE * fp;
   u_char payload_buffer[PAYLOAD_SIZE];
   
@@ -265,8 +265,25 @@ void chunkwritetosocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char *fi
 
     DEBUGN("\t\tack packet recv", recv_pkt->hdr.seq_id);
     debug_print_pkt(recv_pkt);
+    prev_offset = offset;
   }
 
+  if(prev_offset == PAYLOAD_SIZE) {
+    seq_id = getpktseqid(recv_pkt) + 1;
+
+    offset = 0;
+    // send data packet with seq_id =  ack:seq_id + 1
+    nbytes = sendpkt(sock, sent_pkt, WRITE, seq_id, offset, NULL, remote, remote_length);
+
+    DEBUGN("\t\tdata packet sent", sent_pkt->hdr.seq_id); 
+    debug_print_pkt(sent_pkt);
+    
+    // get ack packet for data packet: seq_id or resend data packet: seq_id 
+    nbytes = waitforpkt(sock, sent_pkt, recv_pkt, remote, remote_length, TRUE);
+
+    DEBUGN("\t\tack packet recv", recv_pkt->hdr.seq_id);
+    debug_print_pkt(recv_pkt);
+  }
 
   fclose(fp);
 
