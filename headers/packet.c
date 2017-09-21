@@ -82,7 +82,7 @@ ssize_t waitforpkt(int sock,  packet *prev_pkt,  packet *recv_pkt,  sockaddr_in 
       if( checkpktwithwriteresponse(prev_pkt) && checkpktflag(recv_pkt, WRITE))
         if(getpktseqid(recv_pkt) == getpktseqid(prev_pkt) + 1 ) break; // Case-2, 4
         if(checkpktflag(prev_pkt, ACK) && getpktseqid(recv_pkt) == getpktseqid(prev_pkt)){
-          DEBUGS1("WARN:ack was lost, resending data packet");
+          DEBUGS1("WARN:ack was lost, resending ack packet");
           debug_print_pkt(prev_pkt);
           nbytes = sendwithsock(sock, prev_pkt, remote, remote_length); // Case-5
 
@@ -110,7 +110,7 @@ ssize_t waitforpkt(int sock,  packet *prev_pkt,  packet *recv_pkt,  sockaddr_in 
 
       if (prev_pkt->hdr.flag == LS_RQ) break;
       // for the case when socket timesout
-      DEBUGS1("WARN:Socket timeout sending again");
+      DEBUGS1("WARN:Socket timeout sending data packet again");
       debug_print_pkt(prev_pkt);
       nbytes = sendwithsock(sock, prev_pkt, remote, remote_length);
 
