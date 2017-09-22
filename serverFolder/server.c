@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <stdio.h>
+#include <glob.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -132,31 +133,19 @@ int main(int argc, char *argv[]){
 }
 
 char *getdir(){
-  DIR *d;
+  u_int i;
   char * result;
   result = (char *) malloc(MAXBUFSIZE*sizeof(char));
 
   bzero(result, MAXBUFSIZE);
-  int flag = 0;
-  struct dirent *dir;
-  d = opendir(".");
 
-  if (d){
-    while ( dir = readdir(d) ){
-      // Not sure why strcmp doesn't work
-      if(strncmp(dir->d_name, ".", 1) && strcmp(dir->d_name, "..")){
+  glob_t glob_result;
+  glob("./*", GLOB_TILDE, NULL, &glob_result);
 
-        if(flag) strcat(result, "\t");		
-
-        strcat(result, dir->d_name);
-        flag = 1;
-
-      }
-
-    }
-    closedir(d); 
+  for(i = 0; i < glob_result.gl_pathc; ++i){
+    strcat(result, glob_result.gl_pathv[i]);
+    strcat(result, "\t");
   }
-
 
   return result;
 }
