@@ -7,7 +7,7 @@ CFLAGS = -g
 all: server
 
 server:
-	$(CC) -o server ../headers/*.c  server.c $(CFLAGS) $(LIBS)
+	$(CC) -o server  server.c $(CFLAGS) $(LIBS)
 
 clean:
 	rm -r server
