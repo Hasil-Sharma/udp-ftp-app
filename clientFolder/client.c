@@ -25,7 +25,7 @@ int main(int argc, char *argv[]){
   int sock, read_line;
   ssize_t nbytes;
 
-  char buff[MAXBUFSIZE], *file_name;
+  char buff[MAXBUFSIZE], file_name[MAXBUFSIZE];
   socklen_t remote_length, from_addr_length;
   u_short seq_id;
   struct sockaddr_in remote, from_addr;
@@ -55,6 +55,7 @@ int main(int argc, char *argv[]){
       bzero(buff, sizeof(buff));
       bzero(&sent_pkt, sizeof(sent_pkt));
       bzero(&recv_pkt, sizeof(recv_pkt));
+      bzero(file_name, sizeof(file_name));
 
       fprintf(stdout, ">>>");
       if( fgets(buff, MAXBUFSIZE, stdin) != NULL && flag_connection) { 
@@ -67,7 +68,7 @@ int main(int argc, char *argv[]){
           
           seq_id = 0;
           
-          file_name = get_second_string(buff);
+          strcpy(file_name, get_second_string(buff));
           // Sending READ Packet
           
           DEBUGS1("\t\tREAD Packet Sent");
@@ -83,8 +84,7 @@ int main(int argc, char *argv[]){
         } else if (strncasecmp(buff, "put ", 4) == 0){
           
           seq_id = 0;
-          file_name = get_second_string(buff);
-
+          strcpy(file_name, get_second_string(buff));
           DEBUGS1(file_name);
           // Sending WRITE Packet
 
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]){
         } else if (strncasecmp(buff, "delete ", 7) == 0){
 
           seq_id = 0;
-          file_name = get_second_string(buff);
+          strcpy(file_name, get_second_string(buff));
           nbytes = sendpkt(sock, &sent_pkt, DL_RQ, seq_id, strlen(file_name), file_name, &remote, remote_length);
           
           DEBUGS1("\t\tDELETE packet sent");

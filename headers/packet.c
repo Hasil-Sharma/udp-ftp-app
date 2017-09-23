@@ -182,6 +182,7 @@ void chunkreadfromsocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char  *
      * - !(resend ack if no data packet is received)
      * */
 
+    bzero(payload, sizeof(payload));
     // writing the first data packet received
 		memcpy(payload, recv_pkt->payload, recv_pkt->hdr.offset);
     fwrite(payload, sizeof(u_char), recv_pkt->hdr.offset, fp);
