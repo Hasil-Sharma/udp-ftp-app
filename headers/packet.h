@@ -17,8 +17,9 @@
 #define LS_RQ 3
 #define DL_RQ 4
 #define EXIT_RQ 5
-#define ACK 6
-#define WRITE 7
+#define UNK_RQ 6
+#define ACK 7
+#define WRITE 8
 
 struct header {
   u_short seq_id; // id of the packet sent TODO: what if number of packets overflow ?

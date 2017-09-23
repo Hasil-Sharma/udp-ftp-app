@@ -26,7 +26,7 @@ void fill_payload( packet* pkt, u_char *payload){
 	bzero(pkt->payload, sizeof(pkt->payload));
   if (pkt->hdr.flag == ACK) { 
     // Do Nothing
-  } else if (pkt->hdr.flag == READ_RQ || pkt->hdr.flag == WRITE_RQ || pkt->hdr.flag == DL_RQ) {
+  } else if (pkt->hdr.flag == READ_RQ || pkt->hdr.flag == WRITE_RQ || pkt->hdr.flag == DL_RQ || pkt->hdr.flag == UNK_RQ) {
     // Sending file name in the packet; only for seq_id == 0
     if (pkt->hdr.seq_id == 0) {
       strcpy(pkt->payload, payload);
@@ -34,12 +34,10 @@ void fill_payload( packet* pkt, u_char *payload){
     }
   } else if (pkt->hdr.flag == WRITE) {
       memcpy(pkt->payload, payload, pkt->hdr.offset);
-  } else if (pkt->hdr.flag == 3) {
-  } else if (pkt->hdr.flag == 4) {
-  } else if (pkt->hdr.flag == 5) {
-  } else if (pkt->hdr.flag == 6) {
   } 
+
 }
+
 
 void getstringfrompayload(u_char *buff,  packet * pkt){
   memcpy(buff, pkt->payload, pkt->hdr.offset);
@@ -78,6 +76,10 @@ ssize_t waitforpkt(int sock,  packet *prev_pkt,  packet *recv_pkt,  sockaddr_in 
       // TODO: Deliberate More
 
       if( /*checkpktflag(prev_pkt, NO_FLAG) && */checkreqflags(recv_pkt) ) break; // Case-1
+      
+      if(checkpktflag(prev_pkt, UNK_RQ) && checkpktflag(recv_pkt, WRITE)) break;
+      
+      if(checkpktflag(prev_pkt, DL_RQ) && checkpktflag(recv_pkt, ACK)) break;
 
       if( checkpktwithwriteresponse(prev_pkt) && checkpktflag(recv_pkt, WRITE))
         if(getpktseqid(recv_pkt) == getpktseqid(prev_pkt) + 1 ) break; // Case-2, 4
@@ -108,7 +110,6 @@ ssize_t waitforpkt(int sock,  packet *prev_pkt,  packet *recv_pkt,  sockaddr_in 
 
     } else {
 
-      if (prev_pkt->hdr.flag == LS_RQ) break;
       // for the case when socket timesout
       DEBUGS1("WARN:Socket timeout sending data packet again");
       debug_print_pkt(prev_pkt);
@@ -314,7 +315,7 @@ u_short getpktseqid( packet* pkt){
 }
 
 int checkreqflags( packet* pkt) {
-  return checkpktflag(pkt, READ_RQ) || checkpktflag(pkt, WRITE_RQ) || checkpktflag(pkt, LS_RQ) || checkpktflag(pkt, EXIT_RQ) || checkpktflag(pkt, DL_RQ);
+  return checkpktflag(pkt, READ_RQ) || checkpktflag(pkt, WRITE_RQ) || checkpktflag(pkt, LS_RQ) || checkpktflag(pkt, EXIT_RQ) || checkpktflag(pkt, DL_RQ) || checkpktflag(pkt, UNK_RQ);
 }
 
 int checkpktflag( packet* pkt, int req) {

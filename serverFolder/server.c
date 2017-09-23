@@ -101,7 +101,6 @@ int main(int argc, char *argv[]){
 
       // Send DATA Packet
       nbytes = sendpkt(sock, &sent_pkt, WRITE, seq_id+1, strlen(buff), buff, &remote, remote_length);
-      free(buff);  
 
     } else if (checkpktflag(&recv_pkt, EXIT_RQ)) {
 
@@ -117,14 +116,25 @@ int main(int argc, char *argv[]){
       DEBUGS1("\t\tRequest is DELETE");
 
       getstringfrompayload(file_name, &recv_pkt);
+      
       debug_print_pkt(&recv_pkt);
+      
       DEBUGS1(file_name);
       if(remove(file_name) != 0){
-
         INFOS("Deleted", file_name);
-      } 
-    }else {
-      flag = FALSE;
+      }
+
+      nbytes = sendpkt(sock, &sent_pkt, ACK, seq_id, 0, NULL, &remote, remote_length);
+
+    } else {
+
+      seq_id = getpktseqid(&recv_pkt);
+      DEBUGS1("\t\tRequest is UNK");
+      getstringfrompayload(file_name, &recv_pkt);
+      DEBUGS1((char*)file_name);
+      strcat((char*)file_name, ": command not understood");
+      nbytes = sendpkt(sock, &sent_pkt, WRITE, seq_id+1, strlen(file_name), file_name, &remote, remote_length);
+
     } 
   }
 

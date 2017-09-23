@@ -112,6 +112,9 @@ int main(int argc, char *argv[]){
           DEBUGS1("\t\tDELETE packet sent");
           debug_print_pkt(&sent_pkt);
 
+          nbytes = waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length, TRUE);
+          DEBUGS1("\t\tFile DELETED");
+
         } else if (strcasecmp(buff, "ls") == 0){
           
           seq_id = 0;
@@ -137,6 +140,18 @@ int main(int argc, char *argv[]){
 
         } else {
 
+          seq_id = 0;
+
+          nbytes = sendpkt(sock, &sent_pkt, UNK_RQ, seq_id, strlen(buff), buff, &remote, remote_length);
+
+          DEBUGS1("\t\tUnknown packet Sent");
+          debug_print_pkt(&sent_pkt);
+          DEBUGS1(buff);
+          nbytes = waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length, TRUE);
+          debug_print_pkt(&recv_pkt);
+          bzero(buff, sizeof(buff));
+          getstringfrompayload(buff, &recv_pkt);
+          fprintf(stdout, "%s\n", buff);
 
         }
 
