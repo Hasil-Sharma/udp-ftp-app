@@ -217,6 +217,7 @@ int main(int argc, char *argv[]){
 
           seq_id = 0;
           nbytes = sendpkt(sock, &sent_pkt, EXIT_RQ, seq_id, 0, NULL, &remote, remote_length);
+          nbytes = waitforpkt(sock, &sent_pkt, &recv_pkt, &remote, remote_length, TRUE);
           flag_connection = FALSE;
 
         } else {
@@ -337,11 +338,13 @@ ssize_t waitforpkt(int sock,  packet *prev_pkt,  packet *recv_pkt,  sockaddr_in 
       /*// PACKET_SIZE is correct*/
       // TODO: Deliberate More
 
-      if( /*checkpktflag(prev_pkt, NO_FLAG) && */checkreqflags(recv_pkt) ) break; // Case-1
+      if(checkreqflags(recv_pkt) ) break; // Case-1
 
       if(checkpktflag(prev_pkt, UNK_RQ) && checkpktflag(recv_pkt, WRITE)) break;
 
       if(checkpktflag(prev_pkt, DL_RQ) && checkpktflag(recv_pkt, ACK)) break;
+
+      if(checkpktflag(prev_pkt, EXIT_RQ) && checkpktflag(recv_pkt, ACK)) break;
 
       if( checkpktwithwriteresponse(prev_pkt) && checkpktflag(recv_pkt, WRITE))
         if(getpktseqid(recv_pkt) == getpktseqid(prev_pkt) + 1 ) break; // Case-2, 4
@@ -370,6 +373,8 @@ ssize_t waitforpkt(int sock,  packet *prev_pkt,  packet *recv_pkt,  sockaddr_in 
 
       DEBUGS1("WARN:partial packet received");
 
+      debug_print_pkt(prev_pkt);
+      nbytes = sendwithsock(sock, prev_pkt, remote, remote_length);
     } else {
 
       // for the case when socket timesout
@@ -556,8 +561,8 @@ void chunkwritetosocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char *fi
 void setsocktimeout(int sock){
   // adding timeout
   struct timeval tv;
-  tv.tv_sec = 0; // 5 sec time out
-  tv.tv_usec = 50000;  // not init'ing this can cause strange errors
+  tv.tv_sec = 0;
+  tv.tv_usec = 50000; 
   if(setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval)) != 0)
     perror("unable to set socket timeout");
 
@@ -566,8 +571,8 @@ void setsocktimeout(int sock){
 void unsetsocktimeout(int sock){
 
   struct timeval tv;
-  tv.tv_sec = 0; // 5 sec time out
-  tv.tv_usec = 0;  // not init'ing this can cause strange errors
+  tv.tv_sec = 0; 
+  tv.tv_usec = 0; 
   if(setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval)) != 0)
     perror("unable to unset socket timeout");
 
@@ -629,7 +634,7 @@ int checkcksum( packet *pkt) {
 }
 
 void encdecpayload(u_char *payload, int offset){
-
+  // Simple XOR Key encrypter and decrypter
 	int index;
 	u_char key = 0x32;
 
