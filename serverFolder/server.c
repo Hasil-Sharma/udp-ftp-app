@@ -447,7 +447,7 @@ void chunkreadfromsocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char  *
 		memcpy(payload, recv_pkt->payload, recv_pkt->hdr.offset);
     // fwrite(payload, sizeof(u_char), recv_pkt->hdr.offset, fp);
 
-    if (fwrite(payload, sizeof(u_char), recv_pkt->hdr.offset, fp) != recv_pkt->hdr.offse) {
+    if (fwrite(payload, sizeof(u_char), recv_pkt->hdr.offset, fp) != recv_pkt->hdr.offset) {
     // An error occurred, handle it somehow
       perror("Error while writing to the file: ");
       exit(0);
