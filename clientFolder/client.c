@@ -103,7 +103,7 @@ void encdecpayload(u_char *, int offset);
 void debug_print_pkt(struct packet *);
 void debug_print_hdr(struct header *);
 
-char * get_second_string(char * );
+void get_second_string(char * , char *);
 
 int main(int argc, char *argv[]){
 
@@ -153,7 +153,8 @@ int main(int argc, char *argv[]){
 
           seq_id = 0;
 
-          strcpy(file_name, get_second_string(buff));
+          get_second_string(buff, file_name);
+          // strcpy(file_name, get_second_string(buff));
           // Sending READ Packet
 
           DEBUGS1("\t\tREAD Packet Sent");
@@ -169,7 +170,9 @@ int main(int argc, char *argv[]){
         } else if (strncasecmp(buff, "put ", 4) == 0){
 
           seq_id = 0;
-          strcpy(file_name, get_second_string(buff));
+
+          get_second_string(buff, file_name);
+          // strcpy(file_name, get_second_string(buff));
           DEBUGS1(file_name);
           // Sending WRITE Packet
 
@@ -191,7 +194,9 @@ int main(int argc, char *argv[]){
         } else if (strncasecmp(buff, "delete ", 7) == 0){
 
           seq_id = 0;
-          strcpy(file_name, get_second_string(buff));
+
+          get_second_string(buff, file_name);
+          // strcpy(file_name, get_second_string(buff));
           nbytes = sendpkt(sock, &sent_pkt, DL_RQ, seq_id, strlen(file_name), file_name, &remote, remote_length);
 
           DEBUGS1("\t\tDELETE packet sent");
@@ -435,6 +440,12 @@ void chunkreadfromsocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char  *
   ssize_t nbytes;
   FILE *fp;
   fp = fopen(file_name, "wb");
+
+  if (fp == NULL){
+      perror("Issue with opening file to write: ");
+      exit(0);
+  }
+
 	u_char payload[PAYLOAD_SIZE];
 
   while(TRUE){
@@ -458,8 +469,13 @@ void chunkreadfromsocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char  *
     bzero(payload, sizeof(payload));
     // writing the first data packet received
 		memcpy(payload, recv_pkt->payload, recv_pkt->hdr.offset);
-    fwrite(payload, sizeof(u_char), recv_pkt->hdr.offset, fp);
+    // fwrite(payload, sizeof(u_char), recv_pkt->hdr.offset, fp);
 
+    if (fwrite(payload, sizeof(u_char), recv_pkt->hdr.offset, fp) != recv_pkt->hdr.offset) {
+    // An error occurred, handle it somehow
+      perror("Error while writing to the file: ");
+      exit(0);
+    }
     seq_id = recv_pkt->hdr.seq_id;
 
     // send ack packet for data packet recv (both have same seq id)
@@ -507,7 +523,10 @@ void chunkwritetosocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char *fi
   DEBUGS1("reading from file and writing to socket");
   fp = fopen(file_name, "rb");
 
-  if (!fp) perror(file_name);
+  if (fp == NULL){
+      perror("Issue with opening file to read: ");
+      exit(0);
+  }
 
   while( ( offset = fread(payload_buffer, sizeof(u_char), PAYLOAD_SIZE, fp) ) != 0){
 
@@ -650,9 +669,10 @@ void encdecpayload(u_char *payload, int offset){
 }
 
 
-char* get_second_string(char* string){
+void get_second_string(char* string, char * dest){
   char *temp = (char *) malloc((strlen(string) + 1)*sizeof(char));
   strcpy(temp, string);
   strtok(temp, " ");
-  return strtok(NULL, " ");
+  strcpy(dest, strtok(NULL, " "));
+  free(temp);
 }

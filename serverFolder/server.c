@@ -416,6 +416,12 @@ void chunkreadfromsocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char  *
   ssize_t nbytes;
   FILE *fp;
   fp = fopen(file_name, "wb");
+
+  if (fp == NULL){
+      perror("Issue with opening file to write: ");
+      exit(0);
+  }
+
 	u_char payload[PAYLOAD_SIZE];
 
   while(TRUE){
@@ -439,7 +445,13 @@ void chunkreadfromsocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char  *
     bzero(payload, sizeof(payload));
     // writing the first data packet received
 		memcpy(payload, recv_pkt->payload, recv_pkt->hdr.offset);
-    fwrite(payload, sizeof(u_char), recv_pkt->hdr.offset, fp);
+    // fwrite(payload, sizeof(u_char), recv_pkt->hdr.offset, fp);
+
+    if (fwrite(payload, sizeof(u_char), recv_pkt->hdr.offset, fp) != recv_pkt->hdr.offse) {
+    // An error occurred, handle it somehow
+      perror("Error while writing to the file: ");
+      exit(0);
+    }
 
     seq_id = recv_pkt->hdr.seq_id;
 
@@ -488,7 +500,10 @@ void chunkwritetosocket(int sock,  packet *sent_pkt,  packet *recv_pkt, char *fi
   DEBUGS1("reading from file and writing to socket");
   fp = fopen(file_name, "rb");
 
-  if (!fp) perror(file_name);
+  if (fp == NULL){
+      perror("Issue with opening file to read: ");
+      exit(0);
+  }
 
   while( ( offset = fread(payload_buffer, sizeof(u_char), PAYLOAD_SIZE, fp) ) != 0){
 
