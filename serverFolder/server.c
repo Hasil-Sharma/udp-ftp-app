@@ -30,15 +30,20 @@
 #define UNK_RQ 6
 #define ACK 7
 #define WRITE 8
+#define LS_RS 9
+#define DL_RS 10
+#define EXIT_RS 11
+#define UNK_RS 12
+
 
 #define MAXBUFSIZE 120 // Set the limit on the length of the file
 
-#define DEBUGS1(s) fprintf(stderr, "DEBUG: %s\n", s)
-#define DEBUGSX(s) fprintf(stderr, "DEBUG: %u\n", s)
-#define DEBUGN(d, s) fprintf(stderr,"DEBUG: %s: %d\n",d,s)
-#define DEBUGS(d, s) fprintf(stderr,"DEBUG: %s: %s\n",d, s)
-#define INFON(d, s) fprintf(stdout, "INFO: %s: %d\n", d, s)
-#define INFOS(d, s) fprintf(stdout, "INFO: %s: %s\n", d, s)
+#define DEBUGS1(s) //fprintf(stderr, "DEBUG: %s\n", s)
+#define DEBUGSX(s) //fprintf(stderr, "DEBUG: %u\n", s)
+#define DEBUGN(d, s) //fprintf(stderr,"DEBUG: %s: %d\n",d,s)
+#define DEBUGS(d, s) //fprintf(stderr,"DEBUG: %s: %s\n",d, s)
+#define INFON(d, s) //fprintf(stdout, "INFO: %s: %d\n", d, s)
+#define INFOS(d, s) //fprintf(stdout, "INFO: %s: %s\n", d, s)
 
 struct header {
   u_short seq_id; // id of the packet sent TODO: what if number of packets overflow ?
@@ -183,13 +188,13 @@ int main(int argc, char *argv[]){
 
       DEBUGS1(buff);
       // Send DATA Packet
-      nbytes = sendpkt(sock, &sent_pkt, WRITE, seq_id+1, strlen(buff), buff, &remote, remote_length);
+      nbytes = sendpkt(sock, &sent_pkt, LS_RS, seq_id+1, strlen(buff), buff, &remote, remote_length);
 
     } else if (checkpktflag(&recv_pkt, EXIT_RQ)) {
 
       seq_id = getpktseqid(&recv_pkt);
       DEBUGS1("\t\tRequest is EXIT");
-      nbytes = sendpkt(sock, &sent_pkt, ACK, seq_id, 0, NULL, &remote, remote_length);
+      nbytes = sendpkt(sock, &sent_pkt, EXIT_RS, seq_id, 0, NULL, &remote, remote_length);
       flag = FALSE;
 
     } else if (checkpktflag(&recv_pkt, DL_RQ)) {
@@ -207,7 +212,7 @@ int main(int argc, char *argv[]){
         INFOS("Deleted", file_name);
       }
 
-      nbytes = sendpkt(sock, &sent_pkt, ACK, seq_id, 0, NULL, &remote, remote_length);
+      nbytes = sendpkt(sock, &sent_pkt, DL_RS, seq_id, 0, NULL, &remote, remote_length);
 
     } else {
 
@@ -216,7 +221,7 @@ int main(int argc, char *argv[]){
       getstringfrompayload(file_name, &recv_pkt);
       DEBUGS1((char*)file_name);
       strcat((char*)file_name, ": command not understood");
-      nbytes = sendpkt(sock, &sent_pkt, WRITE, seq_id+1, strlen(file_name), file_name, &remote, remote_length);
+      nbytes = sendpkt(sock, &sent_pkt, UNK_RS, seq_id+1, strlen(file_name), file_name, &remote, remote_length);
 
     }
   }
@@ -273,15 +278,15 @@ void fill_header( packet* pkt, u_short flag, u_short seq_id, u_short offset){
 void fill_payload( packet* pkt, u_char *payload){
 
 	bzero(pkt->payload, sizeof(pkt->payload));
-  if (pkt->hdr.flag == ACK) {
+  if (checkpktflag(pkt, ACK) || checkpktflag(pkt, DL_RS)) {
     // Do Nothing
-  } else if (pkt->hdr.flag == READ_RQ || pkt->hdr.flag == WRITE_RQ || pkt->hdr.flag == DL_RQ || pkt->hdr.flag == UNK_RQ) {
+  } else if (checkpktflag(pkt, READ_RQ) || checkpktflag(pkt, WRITE_RQ) || checkpktflag(pkt, DL_RQ) || checkpktflag(pkt, UNK_RQ)) {
     // Sending file name in the packet; only for seq_id == 0
     if (pkt->hdr.seq_id == 0) {
       strcpy(pkt->payload, payload);
       pkt->hdr.offset = (u_short) strlen(payload); // get filename.txt 4:"get "
     }
-  } else if (pkt->hdr.flag == WRITE) {
+  } else if (checkpktflag(pkt, WRITE) || checkpktflag(pkt, LS_RS) || checkpktflag(pkt, UNK_RS)) {
       memcpy(pkt->payload, payload, pkt->hdr.offset);
   }
 
@@ -632,5 +637,3 @@ char* get_second_string(char* string){
   strtok(temp, " ");
   return strtok(NULL, " ");
 }
-
-

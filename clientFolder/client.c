@@ -28,6 +28,10 @@
 #define UNK_RQ 6
 #define ACK 7
 #define WRITE 8
+#define LS_RS 9
+#define DL_RS 10
+#define EXIT_RS 11
+#define UNK_RS 12
 
 #define MAXBUFSIZE 120 // Set the limit on the length of the file
 
@@ -340,11 +344,13 @@ ssize_t waitforpkt(int sock,  packet *prev_pkt,  packet *recv_pkt,  sockaddr_in 
 
       if(checkreqflags(recv_pkt) ) break; // Case-1
 
-      if(checkpktflag(prev_pkt, UNK_RQ) && checkpktflag(recv_pkt, WRITE)) break;
+      if(checkpktflag(prev_pkt, UNK_RQ) && checkpktflag(recv_pkt, UNK_RS)) break;
 
-      if(checkpktflag(prev_pkt, DL_RQ) && checkpktflag(recv_pkt, ACK)) break;
+      if(checkpktflag(prev_pkt, DL_RQ) && checkpktflag(recv_pkt, DL_RS)) break;
 
-      if(checkpktflag(prev_pkt, EXIT_RQ) && checkpktflag(recv_pkt, ACK)) break;
+      if(checkpktflag(prev_pkt, EXIT_RQ) && checkpktflag(recv_pkt, EXIT_RS)) break;
+
+      if(checkpktflag(prev_pkt, LS_RQ) && checkpktflag(recv_pkt, LS_RS)) break;
 
       if( checkpktwithwriteresponse(prev_pkt) && checkpktflag(recv_pkt, WRITE))
         if(getpktseqid(recv_pkt) == getpktseqid(prev_pkt) + 1 ) break; // Case-2, 4
@@ -562,7 +568,7 @@ void setsocktimeout(int sock){
   // adding timeout
   struct timeval tv;
   tv.tv_sec = 0;
-  tv.tv_usec = 50000; 
+  tv.tv_usec = 50000;
   if(setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval)) != 0)
     perror("unable to set socket timeout");
 
@@ -571,8 +577,8 @@ void setsocktimeout(int sock){
 void unsetsocktimeout(int sock){
 
   struct timeval tv;
-  tv.tv_sec = 0; 
-  tv.tv_usec = 0; 
+  tv.tv_sec = 0;
+  tv.tv_usec = 0;
   if(setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv,sizeof(struct timeval)) != 0)
     perror("unable to unset socket timeout");
 
@@ -592,12 +598,12 @@ int checkpktflag( packet* pkt, int req) {
 
 int checkpkwithackresponse( packet* pkt){
 
-  return checkpktflag(pkt, WRITE_RQ) || checkpktflag(pkt, EXIT_RQ) || checkpktflag(pkt, DL_RQ) || checkpktflag(pkt, WRITE);
+  return checkpktflag(pkt, WRITE_RQ) || checkpktflag(pkt, WRITE);
 }
 
 int checkpktwithwriteresponse( packet* pkt){
 
-  return checkpktflag(pkt, ACK) || checkpktflag(pkt, READ_RQ) || checkpktflag(pkt, LS_RQ);
+  return checkpktflag(pkt, ACK) || checkpktflag(pkt, READ_RQ);
 
 }
 
@@ -650,4 +656,3 @@ char* get_second_string(char* string){
   strtok(temp, " ");
   return strtok(NULL, " ");
 }
-
