@@ -33,12 +33,12 @@
 
 #define MAXBUFSIZE 120 // Set the limit on the length of the file
 
-#define DEBUGS1(s) //fprintf(stderr, "DEBUG: %s\n", s)
-#define DEBUGSX(s) //fprintf(stderr, "DEBUG: %u\n", s)
-#define DEBUGN(d, s) //fprintf(stderr,"DEBUG: %s: %d\n",d,s)
-#define DEBUGS(d, s) //fprintf(stderr,"DEBUG: %s: %s\n",d, s)
-#define INFON(d, s) //fprintf(stdout, "INFO: %s: %d\n", d, s)
-#define INFOS(d, s) //fprintf(stdout, "INFO: %s: %s\n", d, s)
+#define DEBUGS1(s) fprintf(stderr, "DEBUG: %s\n", s)
+#define DEBUGSX(s) fprintf(stderr, "DEBUG: %u\n", s)
+#define DEBUGN(d, s) fprintf(stderr,"DEBUG: %s: %d\n",d,s)
+#define DEBUGS(d, s) fprintf(stderr,"DEBUG: %s: %s\n",d, s)
+#define INFON(d, s) fprintf(stdout, "INFO: %s: %d\n", d, s)
+#define INFOS(d, s) fprintf(stdout, "INFO: %s: %s\n", d, s)
 
 struct header {
   u_short seq_id; // id of the packet sent TODO: what if number of packets overflow ?
@@ -102,7 +102,7 @@ void debug_print_hdr(struct header *);
 
 char * get_second_string(char * );
 
-char * getdir();
+void getdir(u_char *);
 
 int main(int argc, char *argv[]){
 
@@ -111,7 +111,7 @@ int main(int argc, char *argv[]){
   u_short seq_id;
   struct sockaddr_in sin, remote;
   socklen_t remote_length, offset;
-  u_char  *buff;
+  u_char  buff[4*MAXBUFSIZE];
   char file_name[MAXBUFSIZE];
   struct packet sent_pkt, recv_pkt;
   FILE *fp;
@@ -141,6 +141,7 @@ int main(int argc, char *argv[]){
 
     bzero(&remote, sizeof(remote));
     bzero(file_name, sizeof(file_name));
+    bzero(buff, sizeof(buff));
     remote_length = sizeof(remote);
     bzero(&recv_pkt, sizeof(recv_pkt));
     bzero(&sent_pkt, sizeof(sent_pkt));
@@ -178,8 +179,9 @@ int main(int argc, char *argv[]){
 
       DEBUGS1("\t\tRequest is LS");
       seq_id = getpktseqid(&recv_pkt);
-      buff = (u_char *)getdir();
+      getdir(buff);
 
+      DEBUGS1(buff);
       // Send DATA Packet
       nbytes = sendpkt(sock, &sent_pkt, WRITE, seq_id+1, strlen(buff), buff, &remote, remote_length);
 
@@ -224,13 +226,11 @@ int main(int argc, char *argv[]){
 }
 
 
-char *getdir(){
+void getdir(u_char *buff){
   u_int i;
-  char * result;
-  result = (char *) malloc(MAXBUFSIZE*sizeof(char));
 
-  bzero(result, MAXBUFSIZE);
-
+  char result[4*MAXBUFSIZE];
+  bzero(result, sizeof(result));
   glob_t glob_result;
   glob("./*", GLOB_TILDE, NULL, &glob_result);
 
@@ -239,7 +239,7 @@ char *getdir(){
     strcat(result, "\t");
   }
 
-  return result;
+  memcpy(buff, result, strlen(result) + 1);
 }
 
 void debug_print_pkt(struct packet * pkt){
